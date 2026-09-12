@@ -1,24 +1,18 @@
-# Ashfall County v0.7.3
+# Ashfall County v0.7.4
 
 Simulação observacional mobile-first de apocalipse zumbi e radioativo, sem personagem do jogador.
 
-## v0.7.3 — desbloqueio do cérebro
+## v0.7.4 — intenção persistente + cérebro por evento
 
-- corrige definitivamente a cadeia de `buildContext` que estava usando o `this` errado e quebrava toda decisão antes do `fetch`;
-- o contexto de combate agora usa `sim.combatSummary`, sem procurar esse método no `AIManager`;
-- falhas durante montagem do contexto deixam de ser silenciosas e passam a alimentar `Falhas`, `lastError`, memória de erro e backoff;
-- `ai.decide` possui tratamento de rejeição inesperada e sempre libera o estado `pending`;
-- piso real de 650 ms por agente impede `pulseSoon` de transformar ações sem movimento em spam de decisões;
-- no máximo 5 requisições OpenRouter ficam simultaneamente em voo; não existe fila global, os demais agentes continuam independentes e tentam no heartbeat seguinte;
-- o backoff exponencial real é preservado mesmo que patches antigos tentem encurtar `retryAfter`;
-- o contexto não envia mais `task_queue`, porque agentes de IA usam ciclo direto `decidir → executar → terminar → decidir`;
-- o prompt do cérebro foi alinhado ao ciclo direto atual;
-- nenhuma limitação de créditos foi adicionada e a resposta continua sem `max_tokens` artificial.
+- cada um dos 30 agentes mantém uma intenção física persistente;
+- o corpo continua executando localmente sem depender de uma nova resposta da OpenRouter;
+- replanejamento acontece por mudança relevante: ameaça nova percebida, intenção concluída ou bloqueada, mudança corporal importante, novo ferimento, novidade acumulada e conversa;
+- a resposta da IA é uma nova intenção; se não for urgente durante uma ação, ocupa um único slot de próxima intenção; se for urgente, pode interromper;
+- o limite de 5 requisições simultâneas afeta somente replanejamento e nunca paralisa movimento;
+- a fila antiga permanece desativada para agentes de IA;
+- a inspeção do observador usa sensores de forma passiva e não concede conhecimento ao agente;
+- visão, audição, ruído e intenções ficam em um painel permanente separado do card principal, evitando o efeito de aparecer/desaparecer durante atualizações da inspeção.
 
-## v0.7.2
+## v0.7.3
 
-Mantém ciclo cerebral direto, seleção segura, watchdog, knockback físico, combate sistêmico, sensores, memória experiencial, veículos, crafting e mundo procedural.
-
-## Próxima consolidação
-
-A arquitetura ainda carrega patches históricos. A etapa estrutural seguinte é achatar essas camadas em módulos lógicos do core, reduzindo sobrescritas e tornando depuração/boot mais previsíveis.
+Mantém correções de contexto da IA, backoff real, falhas visíveis, Management Key, métricas automáticas e concorrência máxima de 5 replanejamentos.
