@@ -1,0 +1,3 @@
+100:ms>4?55:25)}}};
+M.snapshot=()=>({cells:M.cells.size,latent:[...M.cells.values()].reduce((n,c)=>n+c.latent,0),active:sim.zombies.reduce((n,z)=>n+(z.alive?1:0),0),realized:M.realized,abstracted:M.abstracted,moved:M.moved,ticks:M.ticks});
+})();

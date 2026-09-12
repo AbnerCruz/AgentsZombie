@@ -1,8 +1,14 @@
-# Ashfall County v0.11 — Streaming de mundo + migração de hordas
+# Ashfall County v0.11 — Condado finito + migração de hordas
 
-A v0.11 continua a auditoria de performance da v0.10.1 sem reduzir a simulação. O foco desta versão é remover picos causados pela geração procedural e substituir spawn oportunista de infectados por uma população macro persistente que migra entre chunks. A população civil de fundo foi removida: o mundo começa com 20 agentes IA; militares continuam sendo entidades especiais ligadas aos eventos do cenário.
+A v0.11 continua a auditoria de performance da v0.10.1 e fecha a principal fonte restante de crescimento: o espaço procedural deixa de ser potencialmente infinito. Ashfall County passa a ser um condado finito de 20×16 chunks (320 chunks possíveis), ainda materializados sob demanda. Isso limita de forma absoluta geração, caches, navegação e migração sem simplificar interiores ou física. A população civil de fundo foi removida: o mundo começa com 20 agentes IA; militares continuam sendo entidades especiais ligadas aos eventos do cenário.
 
 ## Mudanças estruturais v0.11
+
+- mundo finito: `x = -10…9` e `y = -8…7`, total absoluto de 320 chunks;
+- a fronteira existe na física, câmera, A* local, rota grosseira, sensores, spawns e migração; nenhum subsistema pode consultar ou materializar espaço além do condado;
+- Ashfall, Millstone, Briar Glen e a usina permanecem dentro dos limites com margem rural;
+- câmera é limitada ao retângulo do condado e o pathfinding não expande nós para fora dele;
+- a população macro de infectados é inicializada para as 320 células do condado e nunca cresce para coordenadas novas;
 
 - 20 agentes IA iniciais e zero NPCs civis de fundo;
 - exploração de chunks não cria mais sobreviventes ou infectados automaticamente;

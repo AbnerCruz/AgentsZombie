@@ -1,0 +1,12 @@
+'use strict';
+(()=>{
+const AZ=window.AZ,W=AZ?.WorldV9;if(!AZ?.World||!W)return;const BaseWorld=AZ.World,C=W.CELL,G=W.GRID,CS=AZ.CHUNK_SIZE,O=W.OCC;
+const key=(x,y)=>`${x},${y}`;
+const BOUNDS=Object.freeze({minCx:-10,maxCx:9,minCy:-8,maxCy:7,minX:-10*CS,maxX:10*CS,minY:-8*CS,maxY:8*CS,widthChunks:20,heightChunks:16,totalChunks:320});
+W.BOUNDS=BOUNDS;
+class WorldV11 extends BaseWorld{
+ constructor(seed){super(seed);this.version=11;this.bounds=BOUNDS;this.maxRenderCache=56;this.generationQueue=new Map();this.previewCache=new Map();this.generationStats={generated:0,background:0,synchronous:0,totalMs:0,maxMs:0,lastMs:0,queued:0,previewed:0,rejected:0};this._backgroundGenerating=false;this._voidOcc=new Uint8Array(G*G);this._voidOcc.fill(O.WALL);this._voidChunk={preview:false,void:true,cx:0,cy:0,zone:'boundary',biome:'void',roads:{vertical:false,horizontal:false},sites:[],vehicles:[],occ:this._voidOcc,cost:new Uint8Array(G*G),lastUsed:0,version:11}}
+ chunkInBounds(cx,cy){return cx>=BOUNDS.minCx&&cx<=BOUNDS.maxCx&&cy>=BOUNDS.minCy&&cy<=BOUNDS.maxCy}
+ worldInBounds(x,y,margin=0){return x>=BOUNDS.minX+margin&&x<BOUNDS.maxX-margin&&y>=BOUNDS.minY+margin&&y<BOUNDS.maxY-margin}
+ clampPoint(x,y,margin=C*1.5){return{x:AZ.clamp(x,BOUNDS.minX+margin,BOUNDS.maxX-margin),y:AZ.clamp(y,BOUNDS.minY+margin,BOUNDS.maxY-margin)}}
+ clampCamera(camera,w,h){const hw=w/(2*Math.max(.18,camera.zoom)),hh=h/(2*Math.max(.18,camera.zoom)),minX=BOUNDS.minX+hw,maxX=BOUNDS.maxX-hw,minY=BOUNDS.minY+hh,maxY=BOUNDS.

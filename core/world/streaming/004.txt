@@ -1,0 +1,7 @@
+)**2<=r2)out.push(s)}}return out}
+ nearbyVehicles(x,y,radius=500){const out=[],r2=radius*radius,minX=Math.max(BOUNDS.minCx,AZ.chunkCoord(x-radius)),maxX=Math.min(BOUNDS.maxCx,AZ.chunkCoord(x+radius)),minY=Math.max(BOUNDS.minCy,AZ.chunkCoord(y-radius)),maxY=Math.min(BOUNDS.maxCy,AZ.chunkCoord(y+radius));if(minX>maxX||minY>maxY)return out;for(let cy=minY;cy<=maxY;cy++)for(let cx=minX;cx<=maxX;cx++){const c=this.peekChunk(cx,cy);if(!c){this.requestChunk(cx,cy,2,'sensor-vehicles');continue}for(const v of c.vehicles||[])if((v.x-x)**2+(v.y-y)**2<=r2)out.push(v)}return out}
+ siteAtLoaded(x,y){if(!this.worldInBounds(x,y))return null;const c=this.peekChunk(AZ.chunkCoord(x),AZ.chunkCoord(y));if(!c)return null;for(const s of c.sites||[])if(x>=s.x&&x<=s.x+s.w&&y>=s.y&&y<=s.y+s.h)return s;return null}
+ siteAt(x,y){if(!this.worldInBounds(x,y))return null;const c=this.getChunk(AZ.chunkCoord(x),AZ.chunkCoord(y));for(const s of c.sites||[])if(x>=s.x&&x<=s.x+s.w&&y>=s.y&&y<=s.y+s.h)return s;return null}
+ cellAtWorld(x,y){if(!this.worldInBounds(x,y)){const gx=Math.floor(x/C),gy=Math.floor(y/C),lx=((gx%G)+G)%G,ly=((gy%G)+G)%G;return{chunk:this._voidChunk,lx,ly,code:O.WALL,gx,gy,x:(gx+.5)*C,y:(gy+.5)*C}}return super.cellAtWorld(x,y)}
+ cellByGlobal(gx,gy){const x=(gx+.5)*C,y=(gy+.5)*C;if(!this.worldInBounds(x,y))return{chunk:this._voidChunk,lx:0,ly:0,code:O.WALL,gx,gy,x,y};return super.cellByGlobal(gx,gy)}
+ isCellBlocked(gx,gy,actor=null,allowClosedDoor=true){const x=(gx+.5)*C,y=(gy+.5)*C;if(!this

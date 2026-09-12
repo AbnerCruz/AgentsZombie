@@ -1,0 +1,11 @@
+'use strict';
+(()=>{
+const sim=window.sim,AZ=window.AZ,W=AZ?.WorldV9,world=sim?.world;if(!sim||!AZ||!W||!world?.requestChunk)return;const CS=AZ.CHUNK_SIZE,perf=sim.performanceCore||{},B=world.bounds||W.BOUNDS;perf.version='0.11';
+const M=sim.zombieMigration={version:'0.11',cells:new Map(),activeCap:120,realized:0,abstracted:0,moved:0,ticks:0,lastMinute:sim.minute,lastReal:performance.now()};
+const k=(cx,cy)=>`${cx},${cy}`,parse=s=>s.split(',').map(Number),chunkOf=(x,y)=>({cx:AZ.chunkCoord(x),cy:AZ.chunkCoord(y)}),inside=(cx,cy)=>world.chunkInBounds?world.chunkInBounds(cx,cy):true;
+function baseline(cx,cy){if(!inside(cx,cy))return 0;const x=(cx+.5)*CS,y=(cy+.5)*CS,zone=W.zoneAt(world,x,y),r=AZ.rand01(sim.seed,cx,cy,61101),base=zone==='center'?20:zone==='urban'?14:zone==='suburb'?8:zone==='rural'?3:1,span=zone==='center'?12:zone==='urban'?10:zone==='suburb'?8:zone==='rural'?5:3;return Math.max(0,base+Math.floor(r*(span+1)))}
+function cell(cx,cy){if(!inside(cx,cy))return null;const id=k(cx,cy);let c=M.cells.get(id);if(!c){c={cx,cy,latent:baseline(cx,cy),base:baseline(cx,cy),spawnSeq:0,lastTouched:sim.minute};M.cells.set(id,c)}c.lastTouched=sim.minute;return c}
+if(B)for(let cy=B.minCy;cy<=B.maxCy;cy++)for(let cx=B.minCx;cx<=B.maxCx;cx++)cell(cx,cy);
+function absorbExisting(){for(const z of sim.zombies){if(!z.alive||z._migrationManaged)continue;const q=chunkOf(z.x,z.y),c=cell(q.cx,q.cy);if(c)c.latent=Math.max(0,c.latent-1);z._migrationManaged=true}}
+absorbExisting();
+const makeZom

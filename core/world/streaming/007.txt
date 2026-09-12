@@ -1,0 +1,5 @@
+:false,S:false,W:false};const k=key(cx,cy),hit=this.edgeCache.get(k);if(hit)return hit;const bx=cx*CS,by=cy*CS,e={N:false,E:false,S:false,W:false},eps=C*.5;for(let i=0;i<G;i++){const p=(i+.5)*C;if(cy>BOUNDS.minCy&&!e.N&&W.roadInfoAt(this,bx+p,by+eps))e.N=true;if(cy<BOUNDS.maxCy&&!e.S&&W.roadInfoAt(this,bx+p,by+CS-eps))e.S=true;if(cx>BOUNDS.minCx&&!e.W&&W.roadInfoAt(this,bx+eps,by+p))e.W=true;if(cx<BOUNDS.maxCx&&!e.E&&W.roadInfoAt(this,bx+CS-eps,by+p))e.E=true;if(e.N&&e.E&&e.S&&e.W)break}this.edgeCache.set(k,e);return e}
+ setCellWorld(x,y,code){if(!this.worldInBounds(x,y))return null;const q=super.setCellWorld(x,y,code),cx=q.chunk.cx,cy=q.chunk.cy;for(let yy=cy-1;yy<=cy+1;yy++)for(let xx=cx-1;xx<=cx+1;xx++)this.edgeCache.delete(key(xx,yy));return q}
+}
+AZ.World=WorldV11;W.World=WorldV11;
+})();
