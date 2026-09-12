@@ -1,0 +1,35 @@
+'use strict';
+(()=>{
+const sim=window.sim,AZ=window.AZ,V=window.AZV8,W=AZ?.WorldV9,renderer=window.renderer;
+if(!sim||!AZ||!V||!W)return;
+const clamp=AZ.clamp,perf=sim.performanceCore=sim.performanceCore||{};
+perf.version='0.10.1';perf.started=performance.now();perf.noiseQueries=0;perf.zombieSensePulses=0;perf.sensorBuilds=0;perf.gridMoves=0;perf.entityCacheHits=0;perf.entityCacheMisses=0;
+
+// Spatial hash incremental: preserva a API near()/rebuild(), mas deixa de destruir e recriar buckets todo frame.
+class IncrementalGrid{
+  constructor(cell=220){this.cell=cell;this.map=new Map();this.keys=new WeakMap();this.members=new Set()}
+  key(x,y){return`${Math.floor(x/this.cell)},${Math.floor(y/this.cell)}`}
+  _add(e,k){let b=this.map.get(k);if(!b)this.map.set(k,b=new Set());b.add(e);this.keys.set(e,k);this.members.add(e)}
+  _remove(e){const k=this.keys.get(e);if(k!=null){const b=this.map.get(k);if(b){b.delete(e);if(!b.size)this.map.delete(k)}}this.keys.delete(e);this.members.delete(e)}
+  sync(items){
+    for(const e of items){
+      if(!e?.alive){if(this.members.has(e))this._remove(e);continue}
+      const k=this.key(e.x,e.y),old=this.keys.get(e);
+      if(old===k)continue;
+      if(old!=null)this._remove(e);
+      this._add(e,k);perf.gridMoves++;
+    }
+  }
+  rebuild(items){this.sync(items)}
+  near(x,y,r){const out=[],c=this.cell,cx=Math.floor(x/c),cy=Math.floor(y/c),n=Math.ceil(r/c),r2=r*r;for(let yy=cy-n;yy<=cy+n;yy++)for(let xx=cx-n;xx<=cx+n;xx++){const b=this.map.get(`${xx},${yy}`);if(!b)continue;for(const e of b)if(e.alive&&(e.x-x)**2+(e.y-y)**2<=r2)out.push(e)}return out}
+}
+const peopleGrid=new IncrementalGrid(sim.peopleGrid?.cell||220),zombieGrid=new IncrementalGrid(sim.zombieGrid?.cell||220);peopleGrid.sync(sim.people);zombieGrid.sync(sim.zombies);sim.peopleGrid=peopleGrid;sim.zombieGrid=zombieGrid;
+sim.rebuildSpatial=function(){this.peopleGrid.sync(this.people);this.zombieGrid.sync(this.zombies);indexNewEntities()};
+
+// Índice estável por id: elimina varreduras lineares repetidas de pessoas/zumbis/estruturas.
+const entityIndex=perf.entityIndex=perf.entityIndex||new Map();
+function indexEntity(e){if(e?.id)entityIndex.set(e.id,e);return e}
+function indexNewEntities(){for(const p of sim.people)if(p?.id&&!entityIndex.has(p.id))entityIndex.set(p.id,p);for(const z of sim.zombies)if(z?.id&&!entityIndex.has(z.id))entityIndex.set(z.id,z);for(const s of sim.structures||[])if(s?.id&&!entityIndex.has(s.id))entityIndex.set(s.id,s)}
+indexNewEntities();
+const oldEntityById=sim.entityById.bind(sim),oldMakePerson=sim.makePerson.bind(sim),oldMakeZombie=sim.makeZombie.bind(sim),oldFindSite=sim.findSiteById.bind(sim);
+sim.makePe
