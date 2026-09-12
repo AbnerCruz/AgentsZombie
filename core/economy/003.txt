@@ -1,0 +1,2 @@
+E.saveGuard=function(enabled,calls,cost){E.guard.enabled=!!enabled;E.guard.maxCallsPerDay=Math.max(0,+calls||0);E.guard.maxCostPerDay=Math.max(0,+cost||0);localStorage.setItem('az_guard_enabled',enabled?'1':'0');localStorage.setItem('az_guard_calls',String(E.guard.maxCallsPerDay));localStorage.setItem('az_guard_cost',String(E.guard.maxCostPerDay))};
+const toolMap=new Map((AZ.AGENT_TOOLS||[]).map(t=>[t.function?.name,t]));
