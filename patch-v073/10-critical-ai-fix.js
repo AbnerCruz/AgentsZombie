@@ -19,7 +19,6 @@ function registerFailure(a,err){
 }
 function clearFailure(a){a.brain.lastError='';a.brain.failStreak=0;a.brain.lastFailureAt=0;a.brain.retryAfter=0;ai.lastError=''}
 
-// Substitui toda a cadeia quebrada de buildContext por uma versão ligada diretamente ao AIManager.
 ai.buildContext=function(a,trigger){
  const wounds=(a.wounds||[]).map(w=>({type:w.type,severity:w.severity>.65?'grave':w.severity>.3?'moderada':'leve',bleeding:w.bleeding>.7?'forte':w.bleeding>.25?'moderado':'baixo'}));
  const site=sim.currentSite?.(a)||sim.world.siteAt(a.x,a.y)||null;
@@ -39,7 +38,7 @@ ai.buildContext=function(a,trigger){
 
 ai.request=async function(job){
  const a=job.agent,model=job.deep?this.deepModel:this.lightModel;
- const sys=`Você é o cérebro individual de ${a.name}. Você controla apenas esta pessoa.\nConhecimento permitido: somente sensores atuais, memórias, falas ouvidas e experiências pessoais fornecidas no contexto.\nNÃO use conhecimento de gênero, roteiro, código ou bastidores. Não chame uma figura de "zumbi", "infectado", "mutante" ou um fenômeno de "radiação" a menos que esse termo tenha sido explicitamente aprendido.\nEscolha UMA ferramenta concreta. Sua decisão só é solicitada quando o corpo está livre; não existe fila de ações planejadas. A física e os sistemas do mundo resolvem as consequências.\nO campo reason deve ser um pensamento curto, em português, focado apenas na próxima decisão. Prefira agir fisicamente quando houver necessidade ou objetivo; use wait/observe apenas quando fizer sentido.`;
+ const sys=`Você é o cérebro individual de ${a.name}. Você controla apenas esta pessoa.\nConhecimento permitido: somente sensores atuais, memórias, falas ouvidas e experiências pessoais fornecidas no contexto.\nNÃO use conhecimento de gênero, roteiro, código ou bastidores. Não chame uma figura de "zumbi", "infectado", "mutante" ou um fenômeno de "radiação" a menos que esse termo tenha sido explicitamente aprendido.\nEscolha UMA ferramenta que represente sua nova intenção. O corpo executa a intenção atual localmente e pode continuar agindo enquanto você reavalia uma mudança relevante. Se a nova intenção não for urgente, ela pode esperar em um único slot para ser executada depois; se for urgente, pode substituir a intenção atual. Não descreva micro-passos: escolha destino, alvo ou objetivo local e deixe a física e os sistemas do mundo resolverem a execução.\nO campo reason deve ser um pensamento curto, em português, focado apenas no motivo da nova intenção. Não repita sensores nem invente fatos.`;
  let err=null;
  for(let attempt=0;attempt<2;attempt++){
   try{
@@ -48,7 +47,7 @@ ai.request=async function(job){
    const data=await this.fetchCompletion(body,a.id);this.calls=(this.calls||0)+1;if(attempt)this.fallbacks=(this.fallbacks||0)+1;this.accountUsage(data.usage,model,a);
    const msg=data.choices?.[0]?.message,tc=msg?.tool_calls?.[0];if(!tc?.function?.name)throw new Error('Modelo não retornou ferramenta.');
    let args={};try{args=JSON.parse(tc.function.arguments||'{}')}catch{throw new Error('Argumentos de ferramenta inválidos.')}
-   a.brain.lastThought=String(args.reason||msg?.content||'').trim()||'Preciso escolher meu próximo passo.';
+   a.brain.lastThought=String(args.reason||msg?.content||'').trim()||'Preciso escolher minha próxima intenção.';
    sim.executeAgentTool(a,tc.function.name,args,{model,deep:job.deep});
    a.brain.lastModel=model;a.brain.lastDecisionAt=sim.minute;clearFailure(a);return true;
   }catch(e){err=e;if(![408,409,429,500,502,503,504].includes(e?.status)||attempt)break;await new Promise(r=>setTimeout(r,250+Math.random()*500))}
@@ -68,5 +67,5 @@ ai.decide=function(agent,deep=false,trigger='routine'){
 };
 
 for(const p of sim.people){if(p.type!=='agent')continue;p.brain.taskQueue=[];p.brain.pending=false;p.brain.pendingSince=0;if(p.brain.failStreak&&!p.brain.lastFailureAt)p.brain.lastFailureAt=performance.now()}
-setTimeout(()=>{const v=document.querySelector('.drawerHead small');if(v)v.textContent='v0.7.3 · cérebro corrigido + concorrência segura'},0);
+setTimeout(()=>{const v=document.querySelector('.drawerHead small');if(v&&!sim._v074Ready)v.textContent='v0.7.3 · cérebro corrigido + concorrência segura'},0);
 })();
