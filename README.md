@@ -1,21 +1,21 @@
-# Ashfall County v0.7.1
+# Ashfall County v0.7.2
 
 Simulação observacional mobile-first de apocalipse zumbi e radioativo, sem personagem do jogador.
 
-## v0.7.1 — liveness real-time + seleção segura
+## v0.7.2 — ciclo cerebral direto + knockback físico
 
-- watchdog em tempo real independente do relógio da simulação para os 30 agentes de IA;
-- agentes ociosos, com cérebro pendurado ou movimento sem progresso são recuperados individualmente;
-- o cérebro não planeja por cima de uma ação física em execução;
-- seleção passa a aceitar apenas entidades inspecionáveis conhecidas;
-- checkpoints e estruturas sem `kind` são normalizados como `structure`;
-- corrige o travamento total do `requestAnimationFrame` ao inspecionar determinadas construções;
-- o renderer limpa seleções inválidas e tenta se recuperar sem matar o mundo;
-- hits bem-sucedidos agora aplicam knockback físico leve; `push` continua sendo o golpe dedicado a criar distância.
+- remove fila de execução dos 30 agentes de IA;
+- cada agente segue `decidir → executar → terminar → decidir novamente`;
+- heartbeat real acorda agentes ociosos sem depender de `nextDecision` ou do relógio simulado;
+- tarefas residuais antigas são descartadas para não bloquear o próximo ciclo;
+- cérebro pendurado é abortado individualmente e tenta novamente;
+- movimento sem progresso é recuperado por agente, sem decisão global/fallback roteirizado;
+- seleção defensiva de pessoas, construções, veículos e estruturas permanece ativa;
+- knockback de hits passa a usar impulso físico curto com decaimento, ficando visível sem substituir o golpe `push`.
 
 ## v0.7
 
-Mantém o combate sistêmico com alcance, postura, equilíbrio, guarda, energia, dor, estresse, habilidades, linha de visão, recuo, quedas, agarrões, regiões corporais, desgaste de armas e pressão coletiva.
+Mantém combate sistêmico com alcance, postura, equilíbrio, guarda, energia, dor, estresse, habilidades, linha de visão, recuo, quedas, agarrões, regiões corporais, desgaste de armas e pressão coletiva.
 
 ## Base
 
