@@ -1,10 +1,14 @@
 'use strict';
-(()=>{if(!document.querySelector('link[data-v04]')){const css=document.createElement('link');css.rel='stylesheet';css.href='v04.css?v=073';css.dataset.v04='1';document.head.appendChild(css)}})();
+(()=>{if(!document.querySelector('link[data-v04]')){const css=document.createElement('link');css.rel='stylesheet';css.href='v04.css?v=080';css.dataset.v04='1';document.head.appendChild(css)}})();
 (async()=>{
- const files=Array.from({length:32},(_,i)=>`parts/${String(i).padStart(3,'0')}.js?v=073`);
- const src=await Promise.all(files.map((u,i)=>fetch(u,{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error(`Falha no módulo ${i}`);return r.text()})));
+ const parts=Array.from({length:32},(_,i)=>`parts/${String(i).padStart(3,'0')}.js?v=080`);
+ const src=await Promise.all(parts.map((u,i)=>fetch(u,{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error(`Falha no módulo base ${i}`);return r.text()})));
  (0,Function)(src.join(''))();
- for(const u of ['patch-v05/patch0.js','patch-v05/patch1.js','patch-v05/patch2.js','patch-v06/00-core.js','patch-v06/01-sensors.js','patch-v06/02-combat.js','patch-v06/03-ranking.js','patch-v06/04-inspector.js','patch-v06/05-metrics.js','patch-v06/06-ai.js','patch-v061/07-hotfix.js','patch-v07/08-agent-liveness.js','patch-v07/09-combat-overhaul.js','patch-v073/10-critical-ai-fix.js','patch-v073/11-safety-guard.js']){
-   const r=await fetch(u+'?v=073',{cache:'no-store'});if(!r.ok)throw new Error(`Falha ao carregar ${u}`);(0,Function)(await r.text())();
- }
-})().catch(e=>{console.error(e);document.body.innerHTML='<pre style="padding:20px;color:#f88;background:#111">Falha ao iniciar: '+String(e.message||e)+'</pre>'});
+ for(const u of ['core/model.js','core/combat.js','core/ai.js']){const r=await fetch(u+'?v=080',{cache:'no-store'});if(!r.ok)throw new Error(`Falha ao carregar ${u}`);(0,Function)(await r.text())();}
+ const runtimeFiles=Array.from({length:8},(_,i)=>`core/runtime/${String(i).padStart(3,'0')}.txt?v=080`);
+ const runtime=await Promise.all(runtimeFiles.map(u=>fetch(u,{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error(`Falha ao carregar ${u}`);return r.text()})));
+ (0,Function)(runtime.join(''))();
+ const uiFiles=Array.from({length:4},(_,i)=>`core/ui/${String(i).padStart(3,'0')}.txt?v=080`);
+ const ui=await Promise.all(uiFiles.map(u=>fetch(u,{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error(`Falha ao carregar ${u}`);return r.text()})));
+ (0,Function)(ui.join(''))();
+})().catch(e=>{console.error(e);document.body.innerHTML='<pre style="padding:20px;color:#f88;background:#111;white-space:pre-wrap">Falha ao iniciar v0.8: '+String(e?.stack||e?.message||e)+'</pre>'});
