@@ -1,4 +1,36 @@
-# Ashfall County v0.10.1 — Performance estrutural + estabilidade
+# Ashfall County v0.11 — Streaming de mundo + migração de hordas
+
+A v0.11 continua a auditoria de performance da v0.10.1 sem reduzir a simulação. O foco desta versão é remover picos causados pela geração procedural e substituir spawn oportunista de infectados por uma população macro persistente que migra entre chunks. A população civil de fundo foi removida: o mundo começa com 20 agentes IA; militares continuam sendo entidades especiais ligadas aos eventos do cenário.
+
+## Mudanças estruturais v0.11
+
+- 20 agentes IA iniciais e zero NPCs civis de fundo;
+- exploração de chunks não cria mais sobreviventes ou infectados automaticamente;
+- chegadas diárias artificiais de civis foram removidas;
+- câmera não força mais materialização completa de todos os chunks visíveis: chunks ausentes entram numa fila e usam uma prévia barata até serem gerados;
+- geração real é processada com orçamento adaptativo, um chunk por vez, priorizando área ocupada, borda para onde alguém caminha, destino da intenção e interação explícita;
+- sensores usam somente chunks já materializados e podem solicitar pré-geração sem bloquear o frame;
+- `siteAt` consulta apenas o chunk físico correto — prédios v0.9 nunca atravessam a fronteira do chunk — removendo a antiga geração implícita de até 9 chunks por consulta;
+- `chunkEdges` da navegação grosseira passa a ser calculado analiticamente pela função de estrada, sem gerar chunks inteiros durante A* de longa distância;
+- portas/janelas têm índice por célula dentro do chunk, evitando varredura de todos os prédios durante pathfinding;
+- o renderer desenha previews baratos para chunks ainda na fila e nunca precisa gerar terreno só porque a câmera passou por uma região;
+- seleção de um chunk ainda não materializado solicita geração prioritária em vez de travar o canvas;
+- iluminação noturna faz culling das fontes antes de criar gradientes;
+- removida uma varredura global redundante de todos os infectados durante direção de veículos;
+- infectados agora possuem população macro por chunk, com conservação entre estado latente e entidade ativa;
+- migração redistribui hordas por pressão de ruído, presença humana, capacidade local e continuidade viária;
+- infectados longe de qualquer humano voltam ao estado latente em vez de consumir CPU;
+- regiões próximas a humanos materializam gradualmente a população latente, com teto de entidades ativas;
+- mortes reduzem a população real; reanimações adicionam novos indivíduos ao sistema, sem respawn mágico;
+- a aba Mundo mostra fila de geração, custo médio/pico de chunk, infectados ativos/latentes e migrações acumuladas.
+
+## Regra de compatibilidade
+
+A geografia determinística e os interiores continuam usando a seed v0.9. A v0.11 muda **quando** chunks são materializados, não **o que** uma seed gera. A migração de infectados é nova e substitui o antigo spawn por exploração, portanto a distribuição dinâmica de hordas muda a partir desta versão.
+
+---
+
+## Base preservada: v0.10.1 — Performance estrutural + estabilidade
 
 A v0.10.1 é uma auditoria de fonte sobre a v0.10. Não reduz a profundidade da simulação e não substitui sistemas por atalhos visuais: remove trabalho repetido que estava sendo executado na frequência errada, corrige mutações causadas por consultas e fecha falhas de integração entre o mundo físico v0.9, sociedade v0.10 e UI.
 
@@ -8,7 +40,7 @@ A v0.10.1 é uma auditoria de fonte sobre a v0.10. Não reduz a profundidade da 
 - percepção de infectados não executa mais busca humana + todos os ruídos + raycast acústico + grade de cheiro em cada frame. O corpo continua se movendo por frame, mas a percepção é pulsada e escalonada por indivíduo;
 - ruídos agora possuem índice espacial. Um infectado ou agente consulta eventos locais e só calcula transmissão física para os candidatos relevantes;
 - o mapa de cheiro é realmente limitado e não varre milhares de entradas a cada depósito após atingir o limite;
-- os 30 agentes deixam de executar dois pipelines de sensores concorrentes. Há um único pulso espacial; o ciclo corporal só monitora limiares e mantém a intenção;
+- os agentes deixam de executar dois pipelines de sensores concorrentes. Há um único pulso espacial; o ciclo corporal só monitora limiares e mantém a intenção;
 - sensores reutilizam uma amostra curta e calculam local/luz/clima uma única vez por percepção; a mesma lista visível de construções serve para percepção e aprendizado;
 - leitura de contexto social é pura: abrir contexto/sensor não cria uma relação entre duas pessoas que nunca interagiram;
 - o hash de deduplicação cognitiva usa percepção passiva e não pode mais ensinar algo ao agente apenas por medir se a situação mudou;
