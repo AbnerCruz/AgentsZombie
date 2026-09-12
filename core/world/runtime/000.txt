@@ -1,0 +1,19 @@
+'use strict';
+(()=>{
+const sim=window.sim,AZ=window.AZ,W=AZ?.WorldV9,V=window.AZV8;if(!sim||!W||!V)return;const O=W.OCC,clamp=AZ.clamp;
+const oldEntity=sim.entityById.bind(sim),oldExec=sim.executeAgentTool.bind(sim),oldFinish=sim.finishAction.bind(sim),oldAdvance=sim.advanceAction.bind(sim),oldUpdatePerson=sim.updatePerson.bind(sim),oldUpdateZombie=sim.updateZombie.bind(sim),oldNpcScavenge=sim.npcScavenge?.bind(sim),oldApply=sim.applyBrainIntent?.bind(sim),oldMaxCarry=sim.maxCarry.bind(sim),oldAddItem=sim.addItem.bind(sim);
+const MOVE=new Set(['move','go_to','flee','npc_seek','npc_wander','npc_flee','reflex_flee','npc_startled_retreat','npc_cautious_approach','enter_vehicle','refuel_vehicle','attack']);
+const moveTool=AZ.AGENT_TOOLS?.find(t=>t.function?.name==='move');if(moveTool)moveTool.function.parameters.properties.pace={type:'string',enum:['walk','run','crouch'],description:'ritmo de deslocamento; correr é mais rápido e barulhento, agachar é lento e silencioso'};
+const dirName=(dx,dy)=>V.dirName(dx,dy),dist=(a,b)=>Math.hypot((a.x||0)-(b.x||0),(a.y||0)-(b.y||0));
+sim.world.version=9;sim.scentMap=sim.scentMap||new Map();sim._v9={version:'0.9.0',started:performance.now(),pathReplans:0,collisions:0,containerSearches:0};
+for(const c of sim.world.chunks.values())c.version=9;
+sim.entityById=function(id){return oldEntity(id)||this.world.entityByWorldId(id)};
+sim.distanceToEntity=function(p,t){if(!t)return Infinity;if(t.kind==='container'||t.kind==='opening')return Math.hypot(t.x-p.x,t.y-p.y);if(t.kind==='site'){const dx=Math.max(t.x-p.x,0,p.x-(t.x+t.w)),dy=Math.max(t.y-p.y,0,p.y-(t.y+t.h));return Math.hypot(dx,dy)}return Math.hypot((t.x+(t.w||0)/2)-p.x,(t.y+(t.h||0)/2)-p.y)};
+sim.inventoryVolume=p=>(p.inventory||[]).reduce((n,i)=>n+W.itemVolume(i)*i.qty,0);sim.maxVolume=p=>14+(p.attr?.strength||4)*1.4+(sim.itemQty(p,'backpack')?14:0);sim.maxCarry=function(p){return oldMaxCarry(p)+(sim.itemQty(p,'backpack')?2:0)};
+sim.addItem=function(p,item,qty=1){const obj={...item};if(obj.volume==null)obj.volume=W.itemVolume(obj);return oldAddItem(p,obj,qty)};
+function inventoryPenalty(p){const wr=sim.inventoryWeight(p)/Math.max(1,sim.maxCarry(p)),vr=sim.inventoryVolume(p)/Math.max(1,sim.maxVolume(p));return clamp(Math.max(wr,vr)-.65,0,.75)}
+function refreshContainer(co){if(!co?.loot)return;for(const i of co.loot){if(i.qty>0&&i.freshUntil!=null&&sim.minute>i.freshUntil&&i.id==='food'){i.id='spoiled_food';i.name='Alimento estragado';i.kind='food_spoiled';i.freshUntil=null;co.dirty=true}}}
+function currentRoom(p){const s=sim.currentSite?.(p);if(!s)return null;return(s.rooms||[]).find(r=>p.x>=r.x&&p.x<=r.x+r.w&&p.y>=r.y&&p.y<=r.y+r.h)||null}
+sim.currentRoom=currentRoom;
+function lighting(p){const light=sim.world.lightAt(sim.minute),hasTorch=sim.itemQty(p,'torch')>0,site=sim.currentSite?.(p);let local=light;if(site&&light<.35)local*=.72;if(hasTorch&&light<.5)local=Math.max(local,.58);return clamp(local,.1,1)}
+sim.canSee=function(a,t,maxRange=500){if(!a||!t)return false;const tx=t.x+(t.w||0)/2,ty=t.y+(t.h||0)/2,d=Math.hypot(tx-a.x,ty-a.y),state=clamp(1-(a.bodyClock?.sleepPressure||0)*.003-(a.pain||0)*.002-(a.stress||0)*.0012,.4,1),range=maxRange*(.28+.72*lighting(a))*state;if(d>range)return false;if(d>42){const da=Math.abs(Math.atan2(Math.sin(Math.atan2(ty-a.y,tx-a.x)-(a.facing||0)),Math.cos(Math.atan2(ty-a.y,tx-a.x)-(a.facing||0))));if(da>1.42)return false}ret
