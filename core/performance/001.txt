@@ -1,0 +1,27 @@
+rson=function(...a){return indexEntity(oldMakePerson(...a))};sim.makeZombie=function(...a){return indexEntity(oldMakeZombie(...a))};
+sim.entityById=function(id){if(!id)return null;const hit=entityIndex.get(id);if(hit){perf.entityCacheHits++;return hit}perf.entityCacheMisses++;let e=this.world.entityByWorldId?.(id)||oldEntityById(id);if(e&&['person','zombie','structure'].includes(e.kind))entityIndex.set(id,e);return e||null};
+sim.findSiteById=function(id){const w=this.world.entityByWorldId?.(id);if(w?.kind==='site')return w;return oldFindSite(id)};
+
+// Cache espacial do local atual. Construções são alinhadas à grade v0.9, então uma célula não muda de interior sem mudar a célula física.
+const oldCurrentSite=sim.currentSite.bind(sim);
+sim.currentSite=function(p){if(!p)return null;const gx=Math.floor(p.x/W.CELL),gy=Math.floor(p.y/W.CELL),c=p._currentSiteCache;if(c&&c.gx===gx&&c.gy===gy)return c.site;const site=oldCurrentSite(p);p._currentSiteCache={gx,gy,site};return site};
+
+// Cheiro realmente limitado: o código antigo varria o Map inteiro a cada nova marca quando passava de 2400 entradas.
+class BoundedScentMap extends Map{
+  constructor(src,max=2200){super();this.max=max;for(const[k,v]of src||[])this.set(k,v)}
+  set(k,v){if(super.has(k))super.delete(k);super.set(k,v);while(super.size>this.max){const first=super.keys().next().value;super.delete(first)}return this}
+}
+sim.scentMap=new BoundedScentMap(sim.scentMap,2200);
+
+// Índice acústico. Ruído é consultado espacialmente; nenhum infectado percorre mais a lista global inteira por frame.
+class NoiseIndex{
+  constructor(cell=320){this.cell=cell;this.map=new Map();this.keyById=new Map()}
+  key(x,y){return`${Math.floor(x/this.cell)},${Math.floor(y/this.cell)}`}
+  add(e){const k=this.key(e.x,e.y);let b=this.map.get(k);if(!b)this.map.set(k,b=new Set());b.add(e);this.keyById.set(e.id,k)}
+  remove(e){const k=this.keyById.get(e.id);if(k==null)return;const b=this.map.get(k);if(b){b.delete(e);if(!b.size)this.map.delete(k)}this.keyById.delete(e.id)}
+  near(x,y,r){const out=[],c=this.cell,cx=Math.floor(x/c),cy=Math.floor(y/c),n=Math.ceil(r/c),r2=r*r;for(let yy=cy-n;yy<=cy+n;yy++)for(let xx=cx-n;xx<=cx+n;xx++){const b=this.map.get(`${xx},${yy}`);if(!b)continue;for(const e of b)if(e.expires>sim.minute&&(e.x-x)**2+(e.y-y)**2<=r2)out.push(e)}return out}
+}
+const noiseIndex=perf.noiseIndex=new NoiseIndex();for(const e of sim.noiseEvents||[])if(e.expires>sim.minute)noiseIndex.add(e);
+let noiseSeq=1,lastNoisePrune=0;sim.noiseEvents=(sim.noiseEvents||[]).filter(e=>e.expires>sim.minute);
+sim.emitNoise=function(x,y,loudness=.2,kind='noise',sourceId=null,label='ruído'){
+  const e={id:`n${no
