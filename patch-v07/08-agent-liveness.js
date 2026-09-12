@@ -1,46 +1,23 @@
 'use strict';
 (()=>{
-const sim=window.sim,AZ=window.AZ;if(!sim?.ai||!AZ)return;
-const MOVING=new Set(['move','go_to','flee','npc_seek','npc_wander','npc_flee','reflex_flee','npc_startled_retreat','npc_cautious_approach','enter_vehicle','refuel_vehicle','drive_vehicle']);
-const ensure=p=>{p.brain.taskQueue=p.brain.taskQueue||[];p.brain.liveness=p.brain.liveness||{x:p.x,y:p.y,minute:sim.minute,lastProgress:sim.minute,lastWake:sim.minute,recoveries:0};return p.brain.liveness};
-for(const p of sim.people)if(p.type==='agent')ensure(p);
-const oldUpdatePerson=sim.updatePerson.bind(sim),oldAdvance=sim.advanceAction.bind(sim);
-function usefulAction(p){const a=p.action;if(!a)return false;if(MOVING.has(a.tool)||a.args?._phase==='approach')return true;return ['attack','craft_v06','craft','build','aid','rest','wait','observe','unlock_vehicle_v061'].includes(a.tool)}
-function expectedMotion(p){const a=p.action;if(!a)return false;if(a.tool==='drive_vehicle')return !!p.vehicleId;if(a.args?._phase==='approach')return true;return MOVING.has(a.tool)&&!['enter_vehicle','refuel_vehicle'].includes(a.tool)}
-function dropCurrentDuplicate(p){const a=p.action;if(!a||!sim.taskSignature)return;const sig=sim.taskSignature(a.tool,a.args||{});p.brain.taskQueue=(p.brain.taskQueue||[]).filter(t=>sim.taskSignature(t.tool,t.args||{})!==sig)}
-sim.recoverAgentLiveness=function(p,why='estado travado'){
- const l=ensure(p);if(p.brain.pending&&p.brain.pendingSince&&performance.now()-p.brain.pendingSince>20000){this.ai.controllers?.get(p.id)?.abort();p.brain.pending=false;p.brain.pendingSince=0}
- dropCurrentDuplicate(p);p.action=null;p.target=null;p.brain.taskQueue=(p.brain.taskQueue||[]).filter(t=>!this.taskStillUseful||this.taskStillUseful(p,t.tool,t.args||{}));p.brain.nextDecision=Math.min(Number.isFinite(p.brain.nextDecision)?p.brain.nextDecision:this.minute,this.minute+.05);p.brain.retryAfter=Math.min(p.brain.retryAfter||0,performance.now()+250);p.brain.novelty=Math.max(1,p.brain.novelty||0);l.x=p.x;l.y=p.y;l.minute=this.minute;l.lastProgress=this.minute;l.lastWake=this.minute;l.recoveries++;p.brain.lastRecovery=why;
-};
-sim.advanceAction=function(p,dt){
- const l=p.type==='agent'?ensure(p):null,ox=p.x,oy=p.y,ov=p.vehicleId&&this.world.vehicleById(p.vehicleId),ovx=ov?.x,ovy=ov?.y,a=p.action;
- oldAdvance(p,dt);
- if(!l)return;
- const nv=p.vehicleId&&this.world.vehicleById(p.vehicleId),moved=Math.hypot(p.x-ox,p.y-oy)>0.04||(nv&&ov&&Math.hypot(nv.x-(ovx??nv.x),nv.y-(ovy??nv.y))>0.04);
- if(moved){l.x=p.x;l.y=p.y;l.lastProgress=this.minute;return}
- if(a&&expectedMotion(p)&&this.minute-l.lastProgress>1.25){this.recoverAgentLiveness(p,`sem progresso em ${a.tool}`)}
-};
-sim.dispatchNextTask=function(p){
- p.brain.taskQueue=p.brain.taskQueue||[];
- while(!p.action&&p.brain.taskQueue.length){const t=p.brain.taskQueue.shift();if(this.taskStillUseful&&!this.taskStillUseful(p,t.tool,t.args||{}))continue;this.executeAgentTool(p,t.tool,t.args,{model:t.model,fromQueue:true});if(p.action||p.vehicleId||t.tool==='consume'||t.tool==='equip'||t.tool==='set_goal')return true}
- return false
-};
-sim.scheduleAgentBrain=function(p){
- if(!p.alive)return;const l=ensure(p),now=performance.now();
- if(!this.ai.enabled||!this.ai.apiKey){this.reflexFallback(p);return}
- if(p.brain.pending){if(p.brain.pendingSince&&now-p.brain.pendingSince>20000)this.ai.controllers?.get(p.id)?.abort();return}
- if(now<(p.brain.retryAfter||0))return;
- if(!p.action&&p.brain.taskQueue.length){if(this.dispatchNextTask(p)){l.lastWake=this.minute;return}}
- if(!p.action&&!p.brain.taskQueue.length&&this.minute-l.lastWake>2.2)p.brain.nextDecision=Math.min(p.brain.nextDecision||this.minute,this.minute+.05);
- if(this.minute<(p.brain.nextDecision||0))return;
- const a=p.action;
- if(a&&p.brain.taskQueue.length>=1)return;
- if(a){const elapsed=this.minute-(a.started||this.minute),ratio=elapsed/Math.max(.5,a.duration||5);if(ratio<.65)return}
- const severe=p.health<45||p.infection>.35||p.radiation>.55||p.stress>82||(p.brain.novelty||0)>5||p.wounds.some(w=>w.infected),deep=severe&&this.minute>(p.brain.complexCooldown||0);
- if(this.ai.decide(p,deep,a?'plan_ahead':'independent_cycle')){p.brain.nextDecision=this.minute+this.rng.range(4,9);l.lastWake=this.minute;if(deep)p.brain.complexCooldown=this.minute+180;p.brain.novelty=Math.max(0,(p.brain.novelty||0)-3)}
-};
-sim.updatePerson=function(p,dt){
- oldUpdatePerson(p,dt);if(p.type!=='agent'||!p.alive)return;const l=ensure(p);
- if(!usefulAction(p)&&!p.brain.pending&&!(p.brain.taskQueue||[]).length&&this.minute-l.lastWake>3.5){p.brain.nextDecision=Math.min(p.brain.nextDecision||this.minute,this.minute+.05);l.lastWake=this.minute-.5}
-};
+const sim=window.sim,AZ=window.AZ,renderer=window.renderer;if(!sim?.ai||!AZ||!renderer)return;
+const MOVING=new Set(['move','go_to','flee','npc_seek','npc_wander','npc_flee','reflex_flee','npc_startled_retreat','npc_cautious_approach','enter_vehicle','refuel_vehicle','drive_vehicle','attack']);
+const meta=new Map();
+const state=p=>{let s=meta.get(p.id);if(!s){const now=performance.now();s={x:p.x,y:p.y,lastMove:now,lastWake:now,lastPhysical:now,recoveries:0};meta.set(p.id,s)}return s};
+for(const p of sim.people)if(p.type==='agent')state(p);
+const oldMake=sim.makePerson.bind(sim);sim.makePerson=function(i,type,opts){const p=oldMake(i,type,opts);if(p.type==='agent')state(p);return p};
+function abortStale(p,now){if(!p.brain.pending)return false;const since=p.brain.pendingSince||0;if(since&&now-since>20500){sim.ai.controllers?.get(p.id)?.abort();p.brain.pending=false;p.brain.pendingSince=0;p.brain.retryAfter=Math.min(p.brain.retryAfter||0,now+350);return true}return false}
+function wake(p,reason,now=performance.now()){const s=state(p);if(!sim.ai.enabled||!sim.ai.apiKey||!p.alive||p.brain.pending)return false;if(now<(p.brain.retryAfter||0))return false;p.brain.nextDecision=sim.minute;p.brain.novelty=Math.max(1,p.brain.novelty||0);if(sim.ai.decide(p,false,reason)){s.lastWake=now;return true}return false}
+sim.scheduleAgentBrain=function(p){if(!p.alive)return;const now=performance.now();state(p);if(!this.ai.enabled||!this.ai.apiKey){this.reflexFallback(p);return}if(p.brain.pending){abortStale(p,now);return}if(now<(p.brain.retryAfter||0))return;if(!p.action&&(p.brain.taskQueue||[]).length){this.dispatchNextTask?.(p);if(p.action)return}if(p.action)return;if(this.minute<(p.brain.nextDecision||0))return;const severe=p.health<45||p.infection>.35||p.radiation>.55||p.stress>82||(p.brain.novelty||0)>5||p.wounds.some(w=>w.infected),deep=severe&&this.minute>(p.brain.complexCooldown||0);if(this.ai.decide(p,deep,'independent_cycle')){p.brain.nextDecision=this.minute+this.rng.range(3,7);state(p).lastWake=now;if(deep)p.brain.complexCooldown=this.minute+180;p.brain.novelty=Math.max(0,(p.brain.novelty||0)-3)}};
+const oldExec=sim.executeAgentTool.bind(sim);sim.executeAgentTool=function(a,name,args={},opts={}){const s=a?.type==='agent'?state(a):null;if(s)s.lastWake=performance.now();const out=oldExec(a,name,args,opts);if(s&&(a.action||a.vehicleId||MOVING.has(name)))s.lastPhysical=performance.now();if(a?.type==='agent'&&!a.action&&!a.brain.pending&&['set_goal','combat_stance','equip','consume','talk','trade','observe'].includes(name))a.brain.nextDecision=Math.min(Number.isFinite(a.brain.nextDecision)?a.brain.nextDecision:this.minute,this.minute+.05);return out};
+setInterval(()=>{if(sim.paused)return;const now=performance.now();for(const p of sim.people){if(p.type!=='agent'||!p.alive)continue;const s=state(p),v=p.vehicleId&&sim.world.vehicleById(p.vehicleId),x=v?.x??p.x,y=v?.y??p.y,moved=Math.hypot(x-s.x,y-s.y)>.7;if(moved){s.x=x;s.y=y;s.lastMove=now;s.lastPhysical=now}abortStale(p,now);const q=p.brain.taskQueue||[];if(!p.action&&!p.brain.pending&&q.length&&sim.dispatchNextTask?.(p)){s.lastWake=now;s.lastPhysical=now;continue}const a=p.action,moving=!!a&&(MOVING.has(a.tool)||a.args?._phase==='approach');if(moving&&now-s.lastMove>2600){p.action=null;p.target=null;if(sim.taskStillUseful)p.brain.taskQueue=q.filter(t=>sim.taskStillUseful(p,t.tool,t.args||{}));p.brain.nextDecision=sim.minute;p.brain.novelty=Math.max(2,p.brain.novelty||0);s.lastMove=now;s.lastPhysical=now;s.recoveries++;wake(p,'movement_stalled',now);continue}if(!p.action&&!p.brain.pending&&!q.length&&now-s.lastWake>4200){wake(p,'idle_watchdog',now);continue}if(!p.action&&!p.brain.pending&&now-s.lastPhysical>7000)wake(p,'physical_inactivity',now)}},500);
+const known=new Set(['person','zombie','site','vehicle','structure']);
+function normalize(o){if(!o)return null;if(!o.kind){if(Number.isFinite(o.w)&&Number.isFinite(o.h)&&Array.isArray(o.loot))o.kind='site';else if(Number.isFinite(o.maxFuel)&&Array.isArray(o.trunk))o.kind='vehicle';else if(Number.isFinite(o.integrity)||o.created!=null||o.owner!=null)o.kind='structure'}return known.has(o.kind)?o:null}
+for(const s of sim.structures||[])normalize(s);let selected=normalize(sim.selected);try{Object.defineProperty(sim,'selected',{configurable:true,enumerable:true,get(){return selected},set(v){selected=normalize(v)}})}catch{sim.selected=selected}
+const oldDeploy=sim.deployMilitary?.bind(sim);if(oldDeploy)sim.deployMilitary=function(...args){const r=oldDeploy(...args);for(const s of this.structures||[])normalize(s);return r};
+renderer.pick=function(sx,sy){const w=this.screenToWorld(sx,sy),rad=30/this.sim.camera.zoom;let best=null,bd=rad*rad;for(const p of this.sim.people){if(!p.alive)continue;const d=(p.x-w.x)**2+(p.y-w.y)**2;if(d<bd){bd=d;best=p}}for(const z of this.sim.zombies){if(!z.alive)continue;const d=(z.x-w.x)**2+(z.y-w.y)**2;if(d<bd){bd=d;best=z}}if(!best)best=this.sim.world.vehicleAt(w.x,w.y,32/this.sim.camera.zoom);if(!best)best=this.sim.world.siteAt(w.x,w.y);if(!best){for(const s of this.sim.structures){normalize(s);const d=(s.x-w.x)**2+(s.y-w.y)**2;if(d<(28/this.sim.camera.zoom)**2){best=s;break}}}best=normalize(best);this.follow=false;this.sim.selected=best;window.dispatchEvent(new CustomEvent('az-selection',{detail:best}))};
+const oldCenter=renderer.centerOnSelected.bind(renderer);renderer.centerOnSelected=function(){const s=normalize(this.sim.selected);if(!s){this.follow=false;this.sim.selected=null;return}return oldCenter()};
+const oldRender=renderer.render.bind(renderer);renderer.render=function(){const s=normalize(this.sim.selected);if(this.sim.selected&&!s){this.sim.selected=null;this.follow=false}try{return oldRender()}catch(err){console.error('Renderer recovered from selection error',err);this.follow=false;this.sim.selected=null;this.pointer.down=false;this.pointer.moved=false;this.touches?.clear?.();try{return oldRender()}catch(e){console.error('Renderer fatal',e);return}}};
+let tries=0;const installKnockback=()=>{tries++;if(typeof sim.resolveCombatAttack!=='function'||typeof sim.combatSummary!=='function'){if(tries<80)setTimeout(installKnockback,50);return}if(sim.resolveCombatAttack.__v071Knockback)return;const previous=sim.resolveCombatAttack.bind(sim);const wrapped=function(attacker,id,style='balanced'){const target=this.entityById(id),before=target?.health??null,tx=target?.x,ty=target?.y,res=previous(attacker,id,style);if(target&&before!=null&&target.health<before&&style!=='push'&&style!=='stomp'){const dx=(tx??target.x)-attacker.x,dy=(ty??target.y)-attacker.y,l=Math.hypot(dx,dy)||1,w=this.weaponStats(attacker),gun=!!w?.ammo,damage=before-target.health;let k=gun?2.4:style==='heavy'?9:style==='quick'?4:6;k*=AZ.clamp(damage/18,.55,1.3);if(target.combat&&this.minute<target.combat.knockedUntil)k*=.35;target.x+=dx/l*k;target.y+=dy/l*k;this.effects.push({type:'impact_v06',x:target.x,y:target.y,life:7,amount:0})}return res};wrapped.__v071Knockback=true;sim.resolveCombatAttack=wrapped};setTimeout(installKnockback,50);
+setTimeout(()=>{const v=document.querySelector('.drawerHead small');if(v)v.textContent='v0.7.1 · liveness real-time + seleção segura'},0);
 })();
