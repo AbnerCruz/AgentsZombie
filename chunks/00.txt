@@ -1,94 +1,103 @@
-(() => {
 'use strict';
 
-const canvas = document.getElementById('world');
-const ctx = canvas.getContext('2d', { alpha: false });
-ctx.imageSmoothingEnabled = false;
+var AZ = window.AZ = window.AZ || {};
+AZ.TILE = 32;
+AZ.CHUNK_TILES = 24;
+AZ.CHUNK_SIZE = AZ.TILE * AZ.CHUNK_TILES;
 
-const $ = id => document.getElementById(id);
-const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
-const lerp = (a,b,t)=>a+(b-a)*t;
-const dist = (a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
-const TAU = Math.PI*2;
-
-class RNG {
-  constructor(seed=1){ this.s = seed >>> 0 || 1; }
-  next(){ let x=this.s; x^=x<<13; x^=x>>>17; x^=x<<5; this.s=x>>>0; return this.s/4294967296; }
-  int(a,b){ return Math.floor(this.next()*(b-a+1))+a; }
-  pick(a){ return a[Math.floor(this.next()*a.length)]; }
-  chance(p){ return this.next()<p; }
-  range(a,b){ return a+(b-a)*this.next(); }
-}
-
-const FIRST = ['Ana','Bruno','Caio','Clara','Davi','Elisa','Fábio','Giovana','Heitor','Iara','João','Lia','Marcos','Nina','Otávio','Paula','Rafael','Sara','Tiago','Vera','Alice','Bento','Cecília','Diego','Eva','Felipe','Helena','Igor','Júlia','Leandro','Maya','Noah','Olívia','Pedro','Raquel','Samuel','Tainá','Vitor','Yasmin','Augusto','Bianca','Ciro','Dora','Enzo','Flávia','Gustavo','Heloísa','Jonas','Karen','Lucas'];
-const LAST = ['Almeida','Barros','Costa','Dias','Esteves','Ferraz','Gomes','Haddad','Ishikawa','Jardim','Klein','Lima','Moura','Nogueira','Oliveira','Pires','Queiroz','Ramos','Silva','Torres','Uchoa','Vieira','Xavier','Yamada','Zanetti'];
-const JOBS = ['enfermeira','médico','professor','mecânico','caixa','policial','bombeiro','radialista','eletricista','motorista','cozinheira','fazendeiro','farmacêutica','segurança','assistente social','técnica de laboratório','carpinteiro','estudante','aposentado','desempregado'];
-const TRAITS = ['altruísta','pragmático','desconfiado','corajoso','ansioso','gregário','solitário','impulsivo','metódico','protetor'];
-const ACTION_LABEL = {
-  home:'voltando para casa', flee:'fugindo do perigo', water:'procurando água', food:'procurando comida', rest:'procurando abrigo', help:'tentando ajudar alguém', group:'procurando pessoas conhecidas', scavenge:'vasculhando recursos', wander:'se deslocando sem destino claro', defend:'se defendendo', hide:'se escondendo', radio:'indo até a estação de rádio', medical:'procurando atendimento', escapeRadiation:'saindo da zona contaminada', panic:'em pânico', shelter:'fortificando um abrigo'
+AZ.hash32 = function(seed,x,y,salt=0){
+  let h=(seed ^ Math.imul(x,374761393) ^ Math.imul(y,668265263) ^ Math.imul(salt,2246822519))>>>0;
+  h=Math.imul(h^(h>>>13),1274126177)>>>0; h^=h>>>16; return h>>>0;
 };
+AZ.rand01 = function(seed,x,y,salt=0){ return AZ.hash32(seed,x,y,salt)/4294967295; };
+AZ.clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+AZ.lerp=(a,b,t)=>a+(b-a)*t;
+AZ.dist2=(a,b)=>{const x=a.x-b.x,y=a.y-b.y;return x*x+y*y};
+AZ.chunkCoord=v=>Math.floor(v/AZ.CHUNK_SIZE);
+AZ.localCoord=v=>((v%AZ.CHUNK_SIZE)+AZ.CHUNK_SIZE)%AZ.CHUNK_SIZE;
 
-class Sim {
+class World {
   constructor(seed){
-    this.seed = seed || (Date.now() & 0xffffffff);
-    this.rng = new RNG(this.seed);
-    this.W=120; this.H=90; this.tile=16;
-    this.time=7*60; this.day=1; this.speed=1; this.paused=false;
-    this.simAccumulator=0; this.last=performance.now();
-    this.chaos=0.14; this.infrastructure=1; this.wind={x:.55,y:.10};
-    this.overlayRad=false; this.overlayTerritory=false; this.overlayPath=false;
-    this.tiles=[]; this.rad=new Float32Array(this.W*this.H); this.fire=new Float32Array(this.W*this.H);
-    this.buildings=[]; this.poi=[]; this.roads=[]; this.agents=[]; this.zombies=[]; this.groups=[]; this.events=[]; this.corpses=[];
-    this.initialAgentCount=100; this.initialNpcCount=180; this.spatialCell=64; this.humanGrid=new Map(); this.zombieGrid=new Map(); this.lastRadioSlot=-1;
-    this.selected=null; this.follow=null; this.nextEventId=1; this.nextGroupId=1;
-    this.camera={x:this.W*8,y:this.H*8,zoom:.68};
-    this.pointer={drag:false,x:0,y:0,lastX:0,lastY:0,moved:false};
-    this.pinch=null;
-    this.generateWorld();
-    this.createPopulation(this.initialAgentCount,this.initialNpcCount);
-    this.seedCrisis();
-    this.bindUI();
-    this.resize();
-    window.addEventListener('resize',()=>this.resize());
-    requestAnimationFrame(t=>this.frame(t));
+    this.seed=seed>>>0;
+    this.chunks=new Map();
+    this.touched=new Map();
+    this.maxRenderCache=96;
+    this.falloutOrigin={x:AZ.CHUNK_SIZE*1.15,y:-AZ.CHUNK_SIZE*.4};
+    this.wind={x:.72,y:.24};
+    this.worldMinute=420;
   }
-
-  idx(x,y){ return y*this.W+x; }
-  inBounds(x,y){ return x>=0&&y>=0&&x<this.W&&y<this.H; }
-  tileAt(x,y){ const tx=Math.floor(x/this.tile),ty=Math.floor(y/this.tile); return this.tiles[this.idx(tx,ty)]; }
-  radAt(x,y){ const tx=clamp(Math.floor(x/this.tile),0,this.W-1),ty=clamp(Math.floor(y/this.tile),0,this.H-1); return this.rad[this.idx(tx,ty)]; }
-
-  generateWorld(){
-    for(let y=0;y<this.H;y++) for(let x=0;x<this.W;x++){
-      const edge=Math.min(x,y,this.W-1-x,this.H-1-y);
-      this.tiles.push({type: edge<3?'forest':'grass', variant:this.rng.int(0,3)});
+  key(cx,cy){return `${cx},${cy}`}
+  biomeAtChunk(cx,cy){
+    const n=AZ.rand01(this.seed,Math.floor(cx/2),Math.floor(cy/2),11);
+    const wet=AZ.rand01(this.seed,Math.floor(cx/3),Math.floor(cy/3),19);
+    if(wet<.09)return 'marsh';
+    if(n<.28)return 'forest';
+    if(n>.82)return 'farmland';
+    return 'suburb';
+  }
+  roadMask(cx,cy){
+    // Coherent infinite road lattice with local procedural branches.
+    const vertical=(Math.abs(cx)%4===0) || (AZ.rand01(this.seed,cx,0,31)<.11);
+    const horizontal=(Math.abs(cy)%4===0) || (AZ.rand01(this.seed,0,cy,37)<.11);
+    return {vertical,horizontal};
+  }
+  getChunk(cx,cy){
+    const k=this.key(cx,cy);
+    let c=this.chunks.get(k); if(c){c.lastUsed=performance.now();return c;}
+    c=this.touched.get(k); if(c){c.lastUsed=performance.now();this.chunks.set(k,c);this.touched.delete(k);return c;}
+    c=this.generateChunk(cx,cy); this.chunks.set(k,c); this.prune(); return c;
+  }
+  generateChunk(cx,cy){
+    const biome=this.biomeAtChunk(cx,cy), roads=this.roadMask(cx,cy), sites=[];
+    const baseX=cx*AZ.CHUNK_SIZE,baseY=cy*AZ.CHUNK_SIZE;
+    const count=biome==='suburb'?7:biome==='farmland'?4:biome==='forest'?2:2;
+    const types=biome==='suburb'?['house','house','house','store','clinic','garage','warehouse']:biome==='farmland'?['farm','barn','house','shed']:['cabin','shed','tower'];
+    for(let i=0;i<count;i++){
+      const r1=AZ.rand01(this.seed,cx,cy,100+i*4),r2=AZ.rand01(this.seed,cx,cy,101+i*4);
+      let lx=72+r1*(AZ.CHUNK_SIZE-144),ly=72+r2*(AZ.CHUNK_SIZE-144);
+      if(roads.vertical && Math.abs(lx-AZ.CHUNK_SIZE/2)<105)lx+=lx<AZ.CHUNK_SIZE/2?-115:115;
+      if(roads.horizontal && Math.abs(ly-AZ.CHUNK_SIZE/2)<105)ly+=ly<AZ.CHUNK_SIZE/2?-115:115;
+      const type=types[Math.floor(AZ.rand01(this.seed,cx,cy,102+i*4)*types.length)];
+      const w=type==='warehouse'?128:type==='farm'?112:80, h=type==='warehouse'?96:64;
+      const loot=this.defaultLoot(type,cx,cy,i);
+      sites.push({id:`${cx}:${cy}:${i}`,type,x:baseX+lx-w/2,y:baseY+ly-h/2,w,h,loot,integrity:100,barricade:0,claimedBy:null,fire:0,dirty:false});
     }
-    const setTile=(x,y,type)=>{ if(this.inBounds(x,y)) this.tiles[this.idx(x,y)]={type,variant:this.rng.int(0,3)}; };
-    // Roads: irregular but coherent small-town grid.
-    const hRoads=[18,35,53,69], vRoads=[22,45,67,88,104];
-    hRoads.forEach((ry,i)=>{
-      for(let x=4;x<this.W-4;x++) for(let dy=-1;dy<=1;dy++) setTile(x,ry+dy,'road');
-      this.roads.push({a:{x:4,y:ry},b:{x:this.W-4,y:ry}});
-    });
-    vRoads.forEach(rx=>{
-      for(let y=5;y<this.H-5;y++) for(let dx=-1;dx<=1;dx++) setTile(rx+dx,y,'road');
-      this.roads.push({a:{x:rx,y:5},b:{x:rx,y:this.H-5}});
-    });
-    // River and contaminated drainage east side.
-    for(let y=0;y<this.H;y++){
-      const cx=112+Math.sin(y*.16)*2;
-      for(let x=Math.floor(cx)-1;x<=Math.floor(cx)+1;x++) setTile(x,y,'water');
-    }
-    // Forest belts.
-    for(let y=3;y<this.H-3;y++) for(let x=3;x<this.W-3;x++){
-      if(this.tiles[this.idx(x,y)].type==='grass' && (x<13 || y>76 || (x>94&&y<16)) && this.rng.chance(.42)) setTile(x,y,'forest');
-    }
-
-    const addBuilding=(name,x,y,w,h,type,capacity=12)=>{
-      const b={id:'b'+this.buildings.length,name,x:x*this.tile,y:y*this.tile,w:w*this.tile,h:h*this.tile,type,capacity,food:0,water:0,meds:0,fort:0,power:true,occupants:new Set()};
-      if(type==='grocery'){b.food=120;b.water=90} if(type==='hospital'){b.meds=70;b.water=40} if(type==='farm'){b.food=80;b.water=70} if(type==='home'){b.food=this.rng.int(4,18);b.water=this.rng.int(5,20)} if(type==='school'){b.food=25;b.water=40} if(type==='police'){b.food=16;b.water=25;b.fort=.35} if(type==='radio'){b.food=8;b.water=15;b.fort=.2}
-      this.buildings.push(b); return b;
-    };
-    // Homes across neighborhoods.
-    const homeSpots=[];
-    [[8,8,18,16],[27,8,16,17],[49,8,15,17],[72,8,13,17],[8,40,12,11],[28,40,13,11],[72,40,12,
+    const hotspot=AZ.rand01(this.seed,cx,cy,777)<.028;
+    if(hotspot)sites.push({id:`${cx}:${cy}:rad`,type:'waste',x:baseX+AZ.CHUNK_SIZE*.68,y:baseY+AZ.CHUNK_SIZE*.32,w:72,h:72,loot:[{id:'iodine',name:'Iodeto de potássio',kind:'medical',qty:1}],integrity:65,barricade:0,claimedBy:null,fire:0,dirty:false});
+    return {cx,cy,biome,roads,sites,hotspot,lastUsed:performance.now()};
+  }
+  defaultLoot(type,cx,cy,i){
+    const q=(salt,min,max)=>min+Math.floor(AZ.rand01(this.seed,cx,cy,salt+i*13)*(max-min+1));
+    const a=[];
+    const push=(id,name,kind,qty,weight=1)=>{if(qty>0)a.push({id,name,kind,qty,weight});};
+    if(['house','cabin','farm'].includes(type)){push('water','Água', 'drink',q(201,1,5),1);push('food','Alimento','food',q(202,1,5),.6);push('cloth','Tecido','material',q(203,0,3),.3)}
+    if(type==='store'){push('water','Água','drink',q(204,5,14));push('food','Alimento','food',q(205,6,18),.6);push('battery','Bateria','utility',q(206,1,5),.2)}
+    if(type==='clinic'){push('bandage','Curativo','medical',q(207,3,8),.2);push('antirad','Quelante','medical',q(208,1,4),.2);push('painkiller','Analgésico','medical',q(209,1,5),.1)}
+    if(['garage','shed','barn'].includes(type)){push('wood','Madeira','material',q(210,2,8),1.5);push('metal','Metal','material',q(211,1,6),1.8);push('toolkit','Ferramentas','tool',q(212,0,2),2)}
+    if(type==='warehouse'){push('wood','Madeira','material',q(213,5,14),1.5);push('metal','Metal','material',q(214,4,12),1.8);push('food','Alimento','food',q(215,1,8),.6)}
+    return a;
+  }
+  radiationAt(x,y,minute=this.worldMinute){
+    const dx=x-this.falloutOrigin.x,dy=y-this.falloutOrigin.y;
+    const along=dx*this.wind.x+dy*this.wind.y;
+    const cross=Math.abs(dx*this.wind.y-dy*this.wind.x);
+    const plume=along>-250?Math.exp(-cross/900)*Math.exp(-Math.max(0,along)/8200):0;
+    const age=Math.max(0,(minute-420)/1440);
+    const decay=Math.exp(-age*.045);
+    const cx=AZ.chunkCoord(x),cy=AZ.chunkCoord(y); const c=this.getChunk(cx,cy);
+    let local=c.hotspot?Math.max(0,1-Math.hypot(AZ.localCoord(x)-AZ.CHUNK_SIZE*.68,AZ.localCoord(y)-AZ.CHUNK_SIZE*.32)/260):0;
+    return AZ.clamp((plume*.9+local*.75)*decay,0,1.5);
+  }
+  terrainAt(x,y){
+    const cx=AZ.chunkCoord(x),cy=AZ.chunkCoord(y),c=this.getChunk(cx,cy),lx=AZ.localCoord(x),ly=AZ.localCoord(y);
+    if(c.roads.vertical && Math.abs(lx-AZ.CHUNK_SIZE/2)<46)return 'road';
+    if(c.roads.horizontal && Math.abs(ly-AZ.CHUNK_SIZE/2)<46)return 'road';
+    return c.biome;
+  }
+  nearbySites(x,y,radius=500){
+    const out=[],r2=radius*radius,ccx=AZ.chunkCoord(x),ccy=AZ.chunkCoord(y),cr=Math.ceil(radius/AZ.CHUNK_SIZE)+1;
+    for(let cy=ccy-cr;cy<=ccy+cr;cy++)for(let cx=ccx-cr;cx<=ccx+cr;cx++){
+      const c=this.getChunk(cx,cy); for(const s of c.sites){const px=s.x+s.w/2,py=s.y+s.h/2;if((px-x)**2+(py-y)**2<=r2)out.push(s)}
+    } return out;
+  }
+  siteAt(x,y){for(const s of this.nearbySites(x,y,110)){if(x>=s.x&&x<=s.x+s.w&&y>=s.y&&y<=s.y+s.h)return s}return 

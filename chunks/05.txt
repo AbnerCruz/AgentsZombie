@@ -1,98 +1,68 @@
-es(b.id))||near.sort((x,y)=>this.relationship(a,y)-this.relationship(a,x))[0];
-    if(!related||this.relationship(a,related)<.15)return;
-    let g=null;
-    if(a.group&&related.group&&a.group!==related.group){
-      const ga=a.group,gb=related.group;
-      const combined=ga.members.size+gb.members.size;
-      if(combined<=12&&this.relationship(a,related)>.52){
-        g=ga.members.size>=gb.members.size?ga:gb;const other=g===ga?gb:ga;
-        for(const id of [...other.members]){const m=this.personById(id);if(m&&m.alive&&!m.turned){m.group=g;g.members.add(id);}}
-        other.members.clear();other.cohesion=0;
-        this.log(this.timeText(),'GRUPO',`${ga.name} e ${gb.name} passam a agir como um único grupo.`);
-      }else return;
-    }else g=a.group||related.group;
-    if(!g){
-      g={id:this.nextGroupId++,name:`Grupo ${this.nextGroupId-1}`,members:new Set(),base:null,cohesion:.52,created:this.totalTime(),colorHue:this.rng.int(30,210),leaderId:null};
-      this.groups.push(g);this.log(this.timeText(),'GRUPO',`${a.name} e ${related.name} começam a se manter juntos.`);
-    }
-    [a,related].forEach(x=>{if(!x.group||x.group===g){x.group=g;g.members.add(x.id);}});
-    near.filter(x=>(!x.group||x.group===g)&&x.sociability>.5&&x.stress>28&&this.relationship(a,x)>.05).slice(0,4).forEach(x=>{x.group=g;g.members.add(x.id);});
-    this.electLeader(g);
-    if(g.members.size>=4&&!g.base){
-      const members=[...g.members].map(id=>this.personById(id)).filter(Boolean);
-      const cx=members.reduce((sum,x)=>sum+x.x,0)/members.length,cy=members.reduce((sum,x)=>sum+x.y,0)/members.length;
-      const candidates=this.buildings.filter(b=>['home','school','shelter','farm','police'].includes(b.type)&&Math.hypot((b.x+b.w/2)-cx,(b.y+b.h/2)-cy)<430);
-      if(candidates.length){
-        g.base=candidates.reduce((p,c)=>(this.safetyOf(c)-Math.hypot(c.x-cx,c.y-cy)*.0007)>(this.safetyOf(p)-Math.hypot(p.x-cx,p.y-cy)*.0007)?c:p);
-        g.name=`${g.base.name} · grupo ${g.id}`;
-        this.log(this.timeText(),'ABRIGO',`${g.name} começa a funcionar como ponto de encontro.`);
-        members.forEach(m=>m.beliefs.add('shelter-open'));
-      }
-    }
-  }
+else if(args.item_id==='painkiller')a.pain=Math.max(0,a.pain-25);
+     setAction(name,args,1);a.action=null;return;
+   }
+   if(name==='scavenge'){
+     const s=this.findSiteById(args.site_id);if(!s)return reject('local desconhecido');if(Math.hypot(s.x+s.w/2-a.x,s.y+s.h/2-a.y)>105){a.target={x:s.x+s.w/2,y:s.y+s.h/2};args._phase='approach';return setAction(name,args,8)}return setAction(name,args,14+this.rng.range(0,12));
+   }
+   if(name==='craft'){
+     const r=RECIPES[args.recipe];if(!r)return reject('receita desconhecida');if(!this.hasNeed(a,r.need))return reject('materiais insuficientes');return setAction(name,args,r.minutes*(1.15-a.attr.intellect*.035));
+   }
+   if(name==='build'){
+     const b=BUILD[args.structure];if(!b)return reject('estrutura desconhecida');if(!this.hasNeed(a,b.need))return reject('materiais insuficientes');return setAction(name,args,b.minutes*(1.15-a.attr.strength*.025));
+   }
+   if(name==='talk'){
+     const p=this.people.find(x=>x.id===args.person_id&&x.alive);if(!p)return reject('pessoa indisponível');if(Math.hypot(p.x-a.x,p.y-a.y)>220)return reject('pessoa longe demais');this.resolveTalk(a,p,args.message,args.intent);setAction(name,args,2);a.action=null;return;
+   }
+   if(name==='attack'){
+     const t=this.entityById(args.target_id);if(!t||!t.alive)return reject('alvo inválido');if(Math.hypot(t.x-a.x,t.y-a.y)>90){a.target={x:t.x,y:t.y,id:t.id};args._phase='approach';return setAction(name,args,5)}return setAction(name,args,2.5);
+   }
+   if(name==='aid'){
+     const p=this.people.find(x=>x.id===args.person_id&&x.alive);if(!p)return reject('pessoa indisponível');if(Math.hypot(p.x-a.x,p.y-a.y)>100)return reject('pessoa longe');if(args.item_id&& !this.itemQty(a,args.item_id))return reject('item médico ausente');return setAction(name,args,8);
+   }
+   if(name==='trade'){
+     const p=this.people.find(x=>x.id===args.person_id&&x.alive);if(!p)return reject('pessoa indisponível');if(Math.hypot(p.x-a.x,p.y-a.y)>130)return reject('pessoa longe');this.resolveTrade(a,p,args);setAction(name,args,2);a.action=null;return;
+   }
+   if(name==='rest')return setAction(name,args,AZ.clamp(+args.hours||1,.25,8)*60);
+   if(name==='observe'){
+     const t=this.entityById(args.target_id);if(!t)return reject('alvo não percebido');this.remember(a,'observation',`Observou ${t.name||t.type||t.id} com atenção. ${t.kind==='person'?this.publicCondition(t):''}`,5,['observation',t.kind||t.type||'site']);setAction(name,args,4);return;
+   }
+   if(name==='set_goal'){a.brain.goal=String(args.goal||'');this.remember(a,'goal',`Novo objetivo pessoal: ${a.brain.goal}`,7,['goal']);setAction(name,args,1);a.action=null;return}
+   if(name==='wait')return setAction(name,args,AZ.clamp(+args.minutes||5,1,180));
+   reject('ferramenta não reconhecida');
+ }
 
-  leadershipScore(a){
-    const role=['policial','bombeiro','médico','enfermeira','professor','assistente social'].includes(a.job)?.12:0;
-    return a.leadership*.42+a.courage*.25+a.empathy*.16+(1-a.stress/100)*.12+role;
-  }
+ resolveTalk(a,b,message,intent){
+   const old=a.relations.get(b.id)||0,oldB=b.relations.get(a.id)||0;
+   const stressPenalty=(a.stress+b.stress)/45;const affinity=(a.attr.empathy+b.attr.empathy)/4+this.rng.range(-8,8)-stressPenalty;
+   a.relations.set(b.id,AZ.clamp(old+affinity*.18, -100,100));b.relations.set(a.id,AZ.clamp(oldB+affinity*.22,-100,100));
+   this.remember(a,'dialogue',`Disse a ${b.name}: “${message}”`,6,['social',b.id,intent||'talk']);
+   const reaction=this.npcReaction(b,a,message,intent);this.remember(a,'dialogue',`${b.name} respondeu: “${reaction}”`,6,['social',b.id]);this.remember(b,'dialogue',`${a.name} disse: “${message}” / respondeu: “${reaction}”`,5,['social',a.id]);
+   if(a.type==='agent'&&b.type==='agent'&&this.ai.enabled&&this.ai.apiKey){b.brain.nextDecision=Math.min(b.brain.nextDecision,this.minute+1);b.brain.novelty+=2}
+ }
+ npcReaction(b,a,message,intent){
+   const rel=b.relations.get(a.id)||0,st=b.stress;
+   if(intent==='ask_help')return rel+ b.attr.empathy*6-st*.25>32?'Eu ajudo, mas precisamos agir com cuidado.':'Não posso prometer nada agora.';
+   if(intent==='warn')return b.attr.perception+rel/20>5?'Certo. Vou levar isso a sério.':'Eu ouvi rumores demais hoje. Preciso ver com meus próprios olhos.';
+   if(intent==='recruit')return rel>42?'Fico perto de você por enquanto.':'Prefiro decidir meu próprio caminho.';
+   return rel>55?'Estou ouvindo. Continue.':st>70?'Agora não. Preciso pensar.':'Entendi.';
+ }
+ resolveTrade(a,b,args){
+   const oq=Math.max(0,args.offer_qty|0),rq=Math.max(0,args.request_qty|0);if(this.itemQty(a,args.offer_item)<oq||this.itemQty(b,args.request_item)<rq){this.remember(a,'trade',`${b.name} não pôde realizar a troca proposta.`,4,['social',b.id]);return}
+   const rel=b.relations.get(a.id)||0;const need=(b.thirst>60&&args.offer_item==='water'?25:0)+(b.hunger>60&&args.offer_item==='food'?20:0);const accept=rel+need+this.rng.range(-20,20)>20;
+   if(!accept){this.remember(a,'trade',`${b.name} recusou a troca.`,4,['social',b.id]);return}
+   if(oq){this.takeItem(a,args.offer_item,oq);this.addItem(b,{id:args.offer_item,name:args.offer_item,kind:'misc',weight:.5},oq)}if(rq){this.takeItem(b,args.request_item,rq);this.addItem(a,{id:args.request_item,name:args.request_item,kind:'misc',weight:.5},rq)}
+   a.relations.set(b.id,AZ.clamp((a.relations.get(b.id)||0)+4,-100,100));b.relations.set(a.id,AZ.clamp(rel+5,-100,100));this.remember(a,'trade',`${b.name} aceitou a troca.`,5,['social',b.id]);
+ }
 
-  electLeader(g){
-    const members=[...g.members].map(id=>this.personById(id)).filter(a=>a&&a.alive&&!a.turned);
-    if(!members.length){g.leaderId=null;return;}
-    const leader=members.reduce((p,c)=>this.leadershipScore(c)>this.leadershipScore(p)?c:p);
-    if(g.leaderId!==leader.id){
-      const old=g.leaderId;g.leaderId=leader.id;
-      if(old&&g.members.size>=4)this.log(this.timeText(),'LIDERANÇA',`${leader.name} passa a orientar ${g.name}.`);
-    }
-  }
-
-  updateGroups(dt){
-    for(const g of this.groups){
-      const members=[...g.members].map(id=>this.personById(id)).filter(a=>a&&a.alive&&!a.turned);
-      if(members.length<2)continue;
-      if(!g.leaderId||!this.personById(g.leaderId)?.alive)this.electLeader(g);
-      const avgStress=members.reduce((sum,a)=>sum+a.stress,0)/members.length;
-      const avgTrust=members.reduce((sum,a)=>sum+this.relationship(a,this.personById(g.leaderId)||a),0)/members.length;
-      g.cohesion=clamp(g.cohesion+(members.length*.00002+avgTrust*.00004-avgStress*.0000018)*dt,0,1);
-      if(g.base&&members.length>=5&&g.cohesion>.46){
-        for(const a of members)if(['wander','home'].includes(a.action)&&this.rng.chance(.06)){a.action='shelter';a.target={x:g.base.x+g.base.w/2,y:g.base.y+g.base.h/2};}
-      }
-      if(g.cohesion<.16&&members.length>3&&this.rng.chance(.008*dt)){
-        const leaver=this.rng.pick(members.filter(a=>a.id!==g.leaderId));
-        if(leaver){g.members.delete(leaver.id);leaver.group=null;this.remember(leaver,`Abandonou ${g.name} após conflitos.`);}
-      }
-    }
-    for(const g of this.groups){if(g.members.size<2){for(const id of g.members){const m=this.personById(id);if(m&&m.group===g)m.group=null;}}}
-    this.groups=this.groups.filter(g=>g.members.size>=2);
-  }
-
-  updateZombie(z,dt,minutes){
-    z.decay+=minutes*.0005; z.rad=this.radAt(z.x,z.y);
-    if(z.rad>.3)z.mutation=clamp(z.mutation+minutes*z.rad*.0009,0,1);
-    let prey=this.nearestHuman(z,110+z.mutation*35);
-    if(prey){z.target={x:prey.x,y:prey.y};}
-    else{
-      const pack=this.nearZombies(z,95).filter(o=>o!==z&&o.alive);
-      const guided=pack.find(o=>o.target&&Math.hypot(o.target.x-o.x,o.target.y-o.y)>45);
-      if(guided&&this.rng.chance(.16*dt)){z.target={x:guided.target.x+this.rng.range(-20,20),y:guided.target.y+this.rng.range(-20,20)};}
-      else if(this.rng.chance(.015*dt))z.target=this.randomRoadPoint();
-    }
-    const dx=z.target.x-z.x,dy=z.target.y-z.y,d=Math.hypot(dx,dy)||1;
-    const speed=(9+z.mutation*5)*(1-z.decay*.25);z.x=clamp(z.x+dx/d*speed*dt,5,this.W*this.tile-5);z.y=clamp(z.y+dy/d*speed*dt,5,this.H*this.tile-5);
-    if(prey&&dist(z,prey)<13)this.zombieAttack(z,prey,dt);
-  }
-
-  zombieAttack(z,a,dt){
-    if(!a.alive||a.turned)return;
-    const defense=(a.weapon?.55:.18)+a.courage*.22;
-    if(this.rng.chance((.24+z.mutation*.15)*dt)){
-      const hit=this.rng.range(5,15)*(1-defense*.35);a.health-=hit;a.stress=clamp(a.stress+24,0,100);a.panic=true;
-      if(this.rng.chance(.38)){a.infection=Math.max(a.infection,this.rng.range(.06,.22));this.remember(a,'Foi mordido durante um ataque.');}
-      if(a.health<=0)this.killHuman(a,'ataque de infectado');
-    }
-    if(a.weapon&&this.rng.chance((.17+a.courage*.16)*dt)){z.health-=this.rng.range(12,30);if(z.health<=0){z.alive=false;if(z.source)z.source.alive=false;a.kills++;this.log(this.timeText(),'CONFRONTO',`${a.name} derruba um infectado.`);}}
-  }
-
-  turn(a){
-    if(a.turned||!a.alive)return;a.turned=true;a.health=0;if(a.group)a.group.members.delete(a.id);
-    const z={kind:'zombie',source:a,id:'z'+a.id,name:a.name,x:a.x,y:a.y,target:this.randomRoadPoint(),alive
+ update(dt){
+   if(this.paused)return;this.minute+=dt*this.speed;this.day=Math.floor(this.minute/1440)+1;this.world.worldMinute=this.minute;
+   const simDt=dt*this.speed;this._aiRealClock+=dt;
+   this.rebuildSpatial();
+   for(const p of this.people)if(p.alive)this.updatePerson(p,simDt);
+   for(const z of this.zombies)if(z.alive)this.updateZombie(z,simDt);
+   this.updateCorpses(simDt);this.updateStructures(simDt);this.ai.tick();
+   if(Math.floor(this.minute)%30===0&&this.rng.chance(.004*simDt))this.spawnAmbientEntities();
+ }
+ updatePerson(p,dt){
+   p.hunger=AZ.clamp(p.hunger+dt*.018,0,100);p.thirst=AZ.clamp(p.thirst+dt*.032,0,100);p.energy=AZ.clamp(p.energy-dt*.022,0,100);
+   const rad=this.world.radiationAt(p.x,p.y,this.minute);p.r

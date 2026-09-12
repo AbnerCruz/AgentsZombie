@@ -1,0 +1,47 @@
+BoundingClientRect(),hw=r.width/(2*this.sim.camera.zoom)+pad,hh=r.height/(2*this.sim.camera.zoom)+pad;return Math.abs(x-this.sim.camera.x)<hw&&Math.abs(y-this.sim.camera.y)<hh}
+ drawVignette(w,h){const ctx=this.ctx,g=ctx.createRadialGradient(w/2,h/2,Math.min(w,h)*.25,w/2,h/2,Math.max(w,h)*.72);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(0,0,0,.35)');ctx.fillStyle=g;ctx.fillRect(0,0,w,h)}
+}
+AZ.Renderer=Renderer;
+
+'use strict';
+(() => {
+const AZ=window.AZ,$=id=>document.getElementById(id);
+const params=new URLSearchParams(location.search);const seed=params.has('seed')?(Number(params.get('seed'))>>>0):undefined;
+const sim=window.sim=new AZ.Simulation(seed);const renderer=window.renderer=new AZ.Renderer(sim,$('world'));
+$('seedLabel').textContent=sim.seed;
+
+function openDrawer(tab){$('drawer').classList.add('open');$('drawer').setAttribute('aria-hidden','false');if(tab)activateTab(tab)}
+function closeDrawer(){$('drawer').classList.remove('open');$('drawer').setAttribute('aria-hidden','true')}
+function activateTab(name){document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));$(`${name}Panel`)?.classList.add('active')}
+$('menuBtn').onclick=()=>openDrawer();$('closeDrawer').onclick=closeDrawer;document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>activateTab(b.dataset.tab));
+$('pauseBtn').onclick=()=>{sim.paused=!sim.paused;$('pauseBtn').textContent=sim.paused?'▶':'Ⅱ';$('pauseBtn').classList.toggle('active',!sim.paused)};
+document.querySelectorAll('.speed').forEach(b=>b.onclick=()=>{sim.speed=+b.dataset.speed;document.querySelectorAll('.speed').forEach(x=>x.classList.toggle('active',x===b))});
+$('centerBtn').onclick=()=>renderer.centerOnSelected();
+$('radOverlay').onchange=e=>sim.overlays.rad=e.target.checked;$('needsOverlay').onchange=e=>sim.overlays.needs=e.target.checked;$('namesOverlay').onchange=e=>sim.overlays.names=e.target.checked;
+$('newWorld').onclick=()=>{if(confirm('Criar um novo mundo procedural e reiniciar no Dia 1 às 07:00?'))location.href=location.pathname+'?seed='+((Math.random()*0xffffffff)>>>0)};
+
+$('apiKey').value=sim.ai.apiKey;$('lightModel').value=sim.ai.lightModel;$('deepModel').value=sim.ai.deepModel;$('aiEnabled').checked=sim.ai.enabled;
+$('saveKey').onclick=()=>{sim.ai.saveSettings($('apiKey').value,$('lightModel').value,$('deepModel').value,$('aiEnabled').checked);toast(sim.ai.apiKey?'Configuração de IA salva neste dispositivo.':'Modelos salvos; adicione uma chave para ativar a IA.');for(const p of sim.people)if(p.type==='agent')p.brain.nextDecision=Math.min(p.brain.nextDecision,sim.minute+.1)};
+$('clearKey').onclick=()=>{sim.ai.saveSettings('',$('lightModel').value,$('deepModel').value,$('aiEnabled').checked);$('apiKey').value='';toast('Chave removida deste dispositivo.')};
+$('aiEnabled').onchange=e=>sim.ai.saveSettings($('apiKey').value,$('lightModel').value,$('deepModel').value,e.target.checked);
+
+function toast(t){const el=$('toast');el.textContent=t;el.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove('show'),2400)}
+window.addEventListener('az-selection',e=>{renderSelection(e.detail);if(e.detail)openDrawer('inspect')});
+function pct(v){return Math.round(AZ.clamp(v,0,100))}
+function bar(label,v,invert=false){const n=pct(v),fill=invert?100-n:n;return `<div class="barRow"><span>${label}</span><div class="bar"><i style="width:${fill}%"></i></div><b>${n}</b></div>`}
+function itemList(p){return p.inventory.length?p.inventory.map(i=>`<span class="badge">${escapeHtml(i.name)} ×${i.qty}</span>`).join(''):'<span class="badge">vazio</span>'}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function renderSelection(p){
+ if(!p){$('inspector').innerHTML='<div class="emptyState">Toque em uma pessoa no mapa.</div>';return}
+ if(p.kind==='zombie'){$('inspector').innerHTML=`<div class="personHead"><div><h2>${escapeHtml(p.name)}</h2><small>infectado · mutação ${Math.round(p.mutation*100)}%</small></div></div>${bar('Saúde',p.health)}`;return}
+ const isAgent=p.type==='agent';const rel=[...p.relations.entries()].map(([id,v])=>({q:sim.entityById(id),v})).filter(x=>x.q).sort((a,b)=>Math.abs(b.v)-Math.abs(a.v)).slice(0,8);
+ const mem=p.memory.entries.slice(-10).reverse();const action=p.action?`<div class="actionBox"><small>AÇÃO ATUAL</small><b>${escapeHtml(p.action.tool)}</b><div>${escapeHtml(p.action.args?.reason||'')}</div></div>`:'<div class="actionBox"><small>AÇÃO ATUAL</small><b>aguardando decisão</b></div>';
+ $('inspector').innerHTML=`
+ <div class="personHead"><div><h2>${escapeHtml(p.name)}</h2><small>${p.age} anos · ${escapeHtml(p.profession)}</small></div><span class="badge">${isAgent?'AGENTE IA':'NPC'}</span></div>
+ <div class="badges"><span class="badge">${escapeHtml(p.personality)}</span>${Object.entries(p.attr).map(([k,v])=>`<span class="badge">${k} ${v}</span>`).join('')}</div>
+ ${action}
+ ${isAgent?`<div class="notice"><b>Cérebro:</b> ${escapeHtml(p.brain.lastModel||'ainda não consultado')}<br><b>Objetivo:</b> ${escapeHtml(p.brain.goal||'nenhum definido')} ${p.brain.lastError?`<br><b>Último erro:</b> ${escapeHtml(p.brain.lastError)}`:''}</div>`:''}
+ <h3>Estado</h3><div class="bars">${bar('Saúde',p.health)}${bar('Energia',p.energy)}${bar('Humor',p.mood)}${bar('Fome',p.hunger,true)}${bar('Sede',p.thirst,true)}${bar('Estresse',p.stress,true)}${bar('Dor',p.pain,true)}</div>
+ <div class="badges"><span class="badge">rad ${p.radiation.toFixed(2)}</span><span class="badge">infecção ${(p.infection*100).toFixed(0)}%</span><span class="badge">peso ${sim.inventoryWeight(p).toFixed(1)}/${sim.maxCarry(p).toFixed(0)}</span></div>
+ <h3>Inventário</h3><div class="badges">${itemList(p)}</div>
+ <h3>Relações</h3><div>${rel.length?rel.map(x=>`<div class="memory"><b>${escapeHtml(x.q.name)}</b> · ${Math.round(x.v)} pontos</div>`).join(''):'<div clas

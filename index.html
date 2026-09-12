@@ -3,101 +3,92 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
-  <meta name="theme-color" content="#0b0f12" />
-  <title>Ashfall County — Simulação do Colapso</title>
-  <style>
-:root{
-  color-scheme:dark;
-  --bg:#07090b;--panel:rgba(13,18,22,.86);--line:rgba(255,255,255,.10);--text:#e8eceb;--muted:#93a09c;--accent:#d8e3a7;--danger:#d76a5f;
-}
-*{box-sizing:border-box}html,body,#app{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--text)}
-#world{position:absolute;inset:0;width:100%;height:100%;touch-action:none;image-rendering:pixelated;background:#101611}
-.glass{background:var(--panel);backdrop-filter:blur(10px);border:1px solid var(--line);box-shadow:0 10px 36px rgba(0,0,0,.28)}
-.topbar{position:absolute;left:12px;right:12px;top:max(12px,env(safe-area-inset-top));height:58px;border-radius:14px;padding:8px 10px 8px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;z-index:5}.brand{display:flex;flex-direction:column;min-width:0}.brand strong{font-size:13px;letter-spacing:.16em;white-space:nowrap}.brand span{font-size:11px;color:var(--muted);margin-top:2px}.controls{display:flex;gap:6px;align-items:center}.controls button,.timeline button{border:1px solid var(--line);background:#151b1f;color:#cfd7d4;border-radius:9px;height:34px;padding:0 10px;font-weight:700;font-size:11px}.controls button.active{background:#d8e3a7;color:#111}.controls .danger{color:#ffc5bd;border-color:rgba(215,106,95,.35)}
-.left,.right{position:absolute;top:82px;bottom:158px;width:238px;border-radius:14px;z-index:4;overflow:auto}.left{left:12px}.right{right:12px;width:276px}.left section,.right{padding:14px}.left section+section{border-top:1px solid var(--line)}h2{font-size:10px;letter-spacing:.16em;color:#a8b4b0;margin:0 0 10px}.statsGrid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.statsGrid div{background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.06);padding:9px;border-radius:10px}.statsGrid b{display:block;font-size:19px}.statsGrid span{font-size:10px;color:var(--muted)}
-.meter{margin:10px 0}.meter label{display:flex;justify-content:space-between;font-size:10px;color:#bcc5c2}.meter i{display:block;height:5px;background:#242b2c;border-radius:99px;margin-top:5px;overflow:hidden}.meter em{display:block;height:100%;width:0;background:#b7c7a5}.toggle{display:flex;align-items:center;gap:8px;margin:8px 0;font-size:11px;color:#c9d0ce}.toggle input{display:none}.toggle span{width:28px;height:16px;border-radius:10px;background:#30383a;position:relative}.toggle span:after{content:"";position:absolute;width:10px;height:10px;left:3px;top:3px;background:#9ca6a3;border-radius:50%;transition:.2s}.toggle input:checked+span{background:#7d8e69}.toggle input:checked+span:after{left:15px;background:#eef4df}
-input[type=search]{width:100%;height:34px;border:1px solid var(--line);background:#0e1316;color:#fff;border-radius:9px;padding:0 10px;outline:none}.searchResults{margin-top:8px;max-height:140px;overflow:auto}.searchItem{padding:7px 8px;border-radius:8px;font-size:11px;cursor:pointer}.searchItem:hover{background:rgba(255,255,255,.06)}
-.right .emptyState{color:var(--muted);font-size:12px;line-height:1.5}.inspectName{font-size:20px;font-weight:800;margin:2px 0 3px}.pill{display:inline-flex;padding:4px 7px;border:1px solid var(--line);border-radius:99px;font-size:9px;margin:2px 3px 2px 0;color:#cbd4d1}.kv{display:grid;grid-template-columns:1fr auto;gap:5px 8px;font-size:11px;margin-top:12px}.kv span:nth-child(odd){color:var(--muted)}.thought{margin-top:12px;padding:10px;border-left:2px solid #89956d;background:rgba(255,255,255,.035);font-size:11px;line-height:1.45}.memory{font-size:10px;color:#aeb8b4;border-top:1px solid var(--line);padding:7px 0}.followBtn{margin-top:12px;width:100%;height:34px;border:1px solid var(--line);border-radius:9px;background:#d8e3a7;color:#111;font-weight:800}
-.timeline{position:absolute;left:262px;right:300px;bottom:12px;height:134px;border-radius:14px;z-index:4;padding:10px 12px}.timelineHead{display:flex;align-items:center;justify-content:space-between;font-size:10px;letter-spacing:.12em}.timelineHead button{height:26px;padding:0 8px}.eventFeed{height:89px;margin-top:7px;overflow:auto;font-size:10px}.event{display:grid;grid-template-columns:44px 1fr;gap:8px;padding:5px 0;border-top:1px solid rgba(255,255,255,.05)}.event time{color:#7e8b87}.event strong{color:#d9dfdd}.hint{position:absolute;left:50%;transform:translateX(-50%);bottom:154px;padding:7px 10px;border-radius:9px;font-size:9px;color:#aab4b1;z-index:3;pointer-events:none}
-@media(max-width:980px){.left{width:190px}.right{width:220px}.timeline{left:214px;right:244px}.brand strong{font-size:11px}.controls .danger{display:none}}
-@media(max-width:720px){.topbar{height:52px}.left{top:74px;bottom:112px;width:155px}.right{top:74px;bottom:112px;width:178px}.timeline{left:175px;right:198px;bottom:8px;height:96px}.eventFeed{height:56px}.hint{display:none}.left section{padding:10px}.statsGrid{gap:4px}.statsGrid div{padding:6px}.statsGrid b{font-size:15px}.controls button{height:30px;padding:0 7px}.brand span{font-size:9px}.timelineHead{font-size:8px}}
-
-  </style>
+  <meta name="theme-color" content="#0c0f0d" />
+  <title>Ashfall County — AI Survival Simulation</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="manifest" href="manifest.webmanifest" />
 </head>
 <body>
-  <div id="app">
-    <canvas id="world" aria-label="Simulação observacional"></canvas>
+  <main id="app">
+    <canvas id="world" aria-label="Simulação do mundo"></canvas>
 
     <header class="topbar glass">
-      <div class="brand">
-        <strong>ASHFALL COUNTY · v0.2</strong>
-        <span id="clock">DIA 1 · 07:00</span>
+      <div class="brand"><b>ASHFALL</b><span id="clock">DIA 1 · 07:00</span></div>
+      <div class="stats">
+        <span title="Agentes de IA"><i class="dot agent"></i><b id="agentCount">30</b></span>
+        <span title="NPCs"><i class="dot npc"></i><b id="npcCount">0</b></span>
+        <span title="Infectados"><i class="dot zombie"></i><b id="zombieCount">0</b></span>
       </div>
-      <div class="controls">
-        <button id="pauseBtn" class="iconBtn" title="Pausar / continuar">Ⅱ</button>
-        <button data-speed="1" class="speed active">1×</button>
-        <button data-speed="4" class="speed">4×</button>
-        <button data-speed="16" class="speed">16×</button>
-        <button data-speed="64" class="speed">64×</button>
-        <button id="resetBtn" class="danger">NOVO DIA 1</button>
-      </div>
+      <button id="menuBtn" class="iconBtn" aria-label="Abrir painel">☰</button>
     </header>
 
-    <aside class="left glass">
-      <section>
-        <h2>POPULAÇÃO</h2>
-        <div class="statsGrid">
-          <div><b id="aliveStat">280</b><span>sobreviventes</span></div>
-          <div><b id="infectedStat">0</b><span>infectados</span></div>
-          <div><b id="zombieStat">0</b><span>zumbis</span></div>
-          <div><b id="deadStat">0</b><span>mortos</span></div>
-        </div>
-      </section>
-      <section>
-        <h2>MUNDO</h2>
-        <div class="meter"><label>Caos social <span id="chaosText">0%</span></label><i><em id="chaosBar"></em></i></div>
-        <div class="meter"><label>Radiação média <span id="radText">0%</span></label><i><em id="radBar"></em></i></div>
-        <div class="meter"><label>Infraestrutura <span id="infraText">100%</span></label><i><em id="infraBar"></em></i></div>
-      </section>
-      <section>
-        <h2>CAMADAS</h2>
-        <label class="toggle"><input type="checkbox" id="radToggle"><span></span> Radiação</label>
-        <label class="toggle"><input type="checkbox" id="territoryToggle"><span></span> Grupos</label>
-        <label class="toggle"><input type="checkbox" id="pathToggle"><span></span> Rotas recentes</label>
-      </section>
-      <section>
-        <h2>BUSCAR</h2>
-        <input id="searchAgent" type="search" placeholder="Nome da pessoa..." autocomplete="off" />
+    <nav class="timebar glass" aria-label="Controles de tempo">
+      <button id="pauseBtn" class="iconBtn active">Ⅱ</button>
+      <button class="speed active" data-speed="1">1×</button>
+      <button class="speed" data-speed="4">4×</button>
+      <button class="speed" data-speed="16">16×</button>
+      <button class="speed" data-speed="64">64×</button>
+      <button id="centerBtn" class="iconBtn" title="Centralizar seleção">◎</button>
+    </nav>
+
+    <aside id="drawer" class="drawer glass" aria-hidden="true">
+      <div class="drawerHead">
+        <div><b>OBSERVATÓRIO</b><small>v0.3 · mundo procedural</small></div>
+        <button id="closeDrawer" class="iconBtn">×</button>
+      </div>
+
+      <div class="tabs">
+        <button class="tab active" data-tab="inspect">Pessoa</button>
+        <button class="tab" data-tab="ai">IA</button>
+        <button class="tab" data-tab="worldtab">Mundo</button>
+        <button class="tab" data-tab="log">Registro</button>
+      </div>
+
+      <section class="panel active" id="inspectPanel">
+        <input id="search" class="field" placeholder="Buscar pessoa..." autocomplete="off" />
         <div id="searchResults" class="searchResults"></div>
+        <div id="inspector" class="emptyState">Toque em uma pessoa no mapa.</div>
+      </section>
+
+      <section class="panel" id="aiPanel">
+        <div class="notice">A chave OpenRouter é usada diretamente pelo navegador e armazenada apenas neste dispositivo. Em hospedagem estática, ela não pode ser mantida secreta do próprio navegador.</div>
+        <label>OpenRouter API Key<input id="apiKey" class="field" type="password" placeholder="sk-or-v1-..." autocomplete="off" /></label>
+        <div class="row"><button id="saveKey" class="primary">Salvar</button><button id="clearKey">Remover</button></div>
+        <label>Modelo leve<input id="lightModel" class="field" value="google/gemma-4-26b-a4b-it:free" /></label>
+        <label>Modelo complexo<input id="deepModel" class="field" value="openai/gpt-oss-20b" /></label>
+        <div class="meterBlock">
+          <div><span>Fila IA</span><b id="aiQueue">0</b></div>
+          <div><span>Chamadas</span><b id="aiCalls">0</b></div>
+          <div><span>Falhas</span><b id="aiFails">0</b></div>
+          <div><span>Tokens</span><b id="aiTokens">0</b></div>
+        </div>
+        <label class="switch"><input id="aiEnabled" type="checkbox" checked /><span>Agentes de IA ativos</span></label>
+        <p class="hint">Sem API configurada, os 30 agentes continuam vivos fisicamente, mas ficam em modo de segurança local: necessidades básicas e reação imediata. NPCs e zumbis nunca consomem API.</p>
+      </section>
+
+      <section class="panel" id="worldtabPanel">
+        <div class="meterBlock">
+          <div><span>Seed</span><b id="seedLabel"></b></div>
+          <div><span>Chunks ativos</span><b id="chunkCount">0</b></div>
+          <div><span>Entidades</span><b id="entityCount">0</b></div>
+          <div><span>FPS</span><b id="fps">0</b></div>
+        </div>
+        <label class="switch"><input id="radOverlay" type="checkbox" /><span>Radiação</span></label>
+        <label class="switch"><input id="needsOverlay" type="checkbox" /><span>Estado dos agentes</span></label>
+        <label class="switch"><input id="namesOverlay" type="checkbox" /><span>Nomes</span></label>
+        <button id="newWorld" class="danger">Nova simulação · Dia 1</button>
+        <p class="hint">O terreno é gerado deterministicamente por chunks conforme a câmera e os habitantes exploram. O mapa não possui borda lógica.</p>
+      </section>
+
+      <section class="panel" id="logPanel">
+        <div id="timeline" class="timeline"></div>
       </section>
     </aside>
 
-    <aside class="right glass" id="inspector">
-      <div class="emptyState">
-        <h2>OBSERVADOR</h2>
-        <p>Toque em uma pessoa, zumbi ou ponto da cidade para acompanhar.</p>
-      </div>
-    </aside>
+    <section id="agentCard" class="agentCard glass hidden"></section>
+    <div id="toast" class="toast"></div>
+  </main>
 
-    <div class="timeline glass">
-      <div class="timelineHead">
-        <strong>ARQUIVO DO COLAPSO</strong>
-        <button id="clearFollow">CÂMERA LIVRE</button>
-      </div>
-      <div id="eventFeed" class="eventFeed"></div>
-    </div>
-
-    <div class="hint glass">Arraste para mover · pinça/roda para zoom · toque para inspecionar</div>
-  </div>
-  <script>
-    (async()=>{
-      const parts=['./chunks/00.txt','./chunks/01.txt','./chunks/02.txt','./chunks/03.txt','./chunks/04.txt','./chunks/05.txt','./chunks/06.txt','./chunks/07.txt','./chunks/08.txt'];
-      const source=(await Promise.all(parts.map(p=>fetch(p).then(r=>{if(!r.ok)throw new Error('Falha ao carregar '+p);return r.text()})))).join('');
-      const blob=new Blob([source],{type:'text/javascript'});
-      const script=document.createElement('script');
-      script.src=URL.createObjectURL(blob);
-      document.body.appendChild(script);
-    })().catch(err=>{console.error(err);document.body.insertAdjacentHTML('beforeend','<div style="position:fixed;inset:20px;z-index:99;background:#200;color:#fff;padding:16px">Falha ao iniciar a simulação: '+err.message+'</div>')});
-  </script>
+  <script src="loader.js"></script>
 </body>
 </html>

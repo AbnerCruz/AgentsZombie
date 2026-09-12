@@ -1,76 +1,56 @@
-:true,health:55+this.rng.range(0,30),mutation:clamp(a.radiation/130,0,.75),decay:0};
-    this.zombies.push(z);this.log(this.timeText(),'INFECÇÃO',`${a.name} sucumbe à infecção e se transforma.`,true);this.remember(a,'A infecção venceu.');
-    if(this.selected===a)this.selected=z;if(this.follow===a)this.follow=z;
-  }
+adiation=AZ.clamp(p.radiation+rad*dt*.0018-p.radiation*dt*.00005,0,2);
+   if(p.hunger>80)p.health-=dt*.025;if(p.thirst>82)p.health-=dt*.06;if(p.energy<8)p.health-=dt*.012;if(p.radiation>.7)p.health-=dt*(p.radiation-.6)*.045;
+   if(p.infection>0){p.infection=AZ.clamp(p.infection+dt*(.00042+p.radiation*.00013),0,1.1);p.health-=dt*p.infection*.018;p.stress=AZ.clamp(p.stress+dt*.01,0,100)}
+   if(p.health<=0){this.killPerson(p,'ferimentos/exposição');return}
+   if(p.infection>=1){this.turnPerson(p);return}
+   // Reflexes are physiology, not strategic planning.
+   const nearbyZ=this.zombieGrid.near(p.x,p.y,70);if(nearbyZ.length&&p.action?.tool!=='attack'&&p.action?.tool!=='flee'){p.stress=AZ.clamp(p.stress+dt*.7,0,100);if(p.type==='npc')this.npcFlee(p,nearbyZ[0])}
+   this.advanceAction(p,dt);
+   if(p.type==='agent')this.scheduleAgentBrain(p);else this.updateNPCBrain(p,dt);
+   p.mood=AZ.clamp(p.mood+dt*((50-p.stress*.35-p.hunger*.12-p.thirst*.15-p.pain*.15)-p.mood)*.0015,0,100);
+ }
+ scheduleAgentBrain(p){
+   if(!this.ai.enabled||!this.ai.apiKey){this.reflexFallback(p);return}
+   if(p.brain.pending||p.action)return;if(performance.now()<(p.brain.retryAfter||0))return;if(this.minute<p.brain.nextDecision)return;
+   const severe=p.health<45||p.infection>.45||p.radiation>.55||p.stress>82||p.brain.novelty>5;
+   const deep=severe&&this.minute>p.brain.complexCooldown;
+   if(this.ai.enqueue(p,deep,severe?'critical_state':'action_complete')){p.brain.nextDecision=this.minute+this.rng.range(16,42);if(deep)p.brain.complexCooldown=this.minute+360;p.brain.novelty=Math.max(0,p.brain.novelty-4)}
+ }
+ reflexFallback(p){
+   if(p.action)return;const z=this.zombieGrid.near(p.x,p.y,85)[0];if(z){const dx=p.x-z.x,dy=p.y-z.y,l=Math.hypot(dx,dy)||1;p.target={x:p.x+dx/l*260,y:p.y+dy/l*260};p.action={tool:'reflex_flee',args:{reason:'ameaça imediata'},started:this.minute,duration:5,progress:0};return}
+   if(p.thirst>72&&this.itemQty(p,'water')){this.executeAgentTool(p,'consume',{item_id:'water',reason:'reflexo fisiológico de sede'},{model:'local-reflex'});return}
+   if(p.hunger>78&&this.itemQty(p,'food')){this.executeAgentTool(p,'consume',{item_id:'food',reason:'reflexo fisiológico de fome'},{model:'local-reflex'});return}
+ }
+ updateNPCBrain(p,dt){
+   if(p.action)return;if(this.minute<(p.brain.nextDecision||0))return;p.brain.nextDecision=this.minute+this.rng.range(8,24);
+   const z=this.zombieGrid.near(p.x,p.y,170)[0];if(z){this.npcFlee(p,z);return}
+   if(p.thirst>68&&this.itemQty(p,'water')){this.executeAgentTool(p,'consume',{item_id:'water',reason:'sede'},{model:'npc'});return}
+   if(p.hunger>72&&this.itemQty(p,'food')){this.executeAgentTool(p,'consume',{item_id:'food',reason:'fome'},{model:'npc'});return}
+   const sites=this.world.nearbySites(p.x,p.y,520);
+   if((p.thirst>55||p.hunger>58)&&sites.length){const s=this.rng.pick(sites);p.target={x:s.x+s.w/2,y:s.y+s.h/2};p.action={tool:'npc_seek',args:{site_id:s.id},started:this.minute,duration:15,progress:0};return}
+   if(p.energy<28){p.action={tool:'rest',args:{hours:1,reason:'cansaço'},started:this.minute,duration:60,progress:0};return}
+   const q=this.world.randomPointNear(p.x,p.y,350,Math.floor(this.minute)+p.id.length);p.target=q;p.action={tool:'npc_wander',args:{},started:this.minute,duration:10,progress:0};
+ }
+ npcFlee(p,z){const dx=p.x-z.x,dy=p.y-z.y,l=Math.hypot(dx,dy)||1;p.target={x:p.x+dx/l*320,y:p.y+dy/l*320};p.action={tool:'npc_flee',args:{},started:this.minute,duration:7,progress:0}}
 
-  killHuman(a,cause){if(!a.alive)return;a.alive=false;a.health=0;this.corpses.push({kind:'corpse',x:a.x,y:a.y,name:a.name,cause,age:0,infected:a.infection>.2,source:a,reanimated:false,reanimateAt:a.infection>.2?this.rng.range(12,75):Infinity});this.log(this.timeText(),'MORTE',`${a.name} morreu por ${cause}.`,true);this.remember(a,`Morreu por ${cause}.`);if(a.group)a.group.members.delete(a.id);}
+ npcScavenge(p,siteId){
+   const s=this.findSiteById(siteId);if(!s)return;const wanted=p.thirst>p.hunger?'water':'food';let item=s.loot.find(i=>i.id===wanted&&i.qty>0)||s.loot.find(i=>i.qty>0);if(!item)return;const can=this.maxCarry(p)-this.inventoryWeight(p);if(can<(item.weight||.5))return;item.qty--;s.dirty=true;this.addItem(p,item,1);this.remember(p,'scavenge',`Encontrou ${item.name}.`,3,['scavenge',item.id]);
+ }
 
-  gridKey(x,y){return `${Math.floor(x/this.spatialCell)},${Math.floor(y/this.spatialCell)}`;}
-  rebuildSpatial(){
-    this.humanGrid.clear();this.zombieGrid.clear();
-    for(const h of this.agents){if(!h.alive||h.turned)continue;const k=this.gridKey(h.x,h.y);if(!this.humanGrid.has(k))this.humanGrid.set(k,[]);this.humanGrid.get(k).push(h);}
-    for(const z of this.zombies){if(!z.alive)continue;const k=this.gridKey(z.x,z.y);if(!this.zombieGrid.has(k))this.zombieGrid.set(k,[]);this.zombieGrid.get(k).push(z);}
-  }
-  nearbyFromGrid(grid,a,r){
-    const out=[],cx=Math.floor(a.x/this.spatialCell),cy=Math.floor(a.y/this.spatialCell),n=Math.ceil(r/this.spatialCell);
-    for(let yy=cy-n;yy<=cy+n;yy++)for(let xx=cx-n;xx<=cx+n;xx++){const bucket=grid.get(`${xx},${yy}`);if(bucket)for(const o of bucket)if(Math.abs(o.x-a.x)<=r&&Math.abs(o.y-a.y)<=r)out.push(o);}
-    return out;
-  }
-  nearHumans(a,r){return this.nearbyFromGrid(this.humanGrid,a,r).filter(h=>h.alive&&!h.turned&&dist(a,h)<=r);}
-  nearZombies(a,r){return this.nearbyFromGrid(this.zombieGrid,a,r).filter(z=>z.alive&&dist(a,z)<=r);}
-  nearestZombie(a,r){let best=null,bd=r;for(const z of this.nearZombies(a,r)){if(z===a)continue;const d=dist(a,z);if(d<bd){bd=d;best=z;}}return best;}
-  nearestHuman(a,r,pred=()=>true){let best=null,bd=r;for(const h of this.nearHumans(a,r)){if(h===a||!pred(h))continue;const d=dist(a,h);if(d<bd){bd=d;best=h;}}return best;}
-  personById(id){return this.agents[id-1]||null;}
-  buildingAt(x,y){return this.buildings.find(b=>x>=b.x&&y>=b.y&&x<=b.x+b.w&&y<=b.y+b.h);}
-  remember(a,text){if(!a.memories)return;a.memories.unshift(text);const max=a.cognitive==='agent'?12:4;if(a.memories.length>max)a.memories.length=max;}
-
-  relationship(a,b){
-    if(!a||!b||a===b)return .5;
-    if(!a.relations.has(b.id))a.relations.set(b.id,a.family.includes(b.id)?this.rng.range(.58,.9):this.rng.range(-.08,.22));
-    return a.relations.get(b.id);
-  }
-  adjustRelationship(a,b,delta){if(!a||!b||a===b)return;const v=clamp(this.relationship(a,b)+delta,-1,1);a.relations.set(b.id,v);}
-  socialExchange(a,b){
-    const baseTrust=(this.relationship(a,b)+this.relationship(b,a))/2;
-    const kin=a.family.includes(b.id)||b.family.includes(a.id);
-    const delta=(kin?.025:.008)+(a.stress>75&&b.stress>75?-.012:0);
-    this.adjustRelationship(a,b,delta);this.adjustRelationship(b,a,delta*.8);
-    if(a.beliefs.size&&this.rng.chance(.58+a.sociability*.22)){
-      const belief=this.rng.pick([...a.beliefs]);b.beliefs.add(belief);
-      if(b.cognitive==='agent'&&this.rng.chance(.22))this.remember(b,`${a.name} contou algo sobre ${this.beliefLabel(belief)}.`);
-    }
-    if(b.beliefs.size&&this.rng.chance(.52+b.sociability*.2))a.beliefs.add(this.rng.pick([...b.beliefs]));
-    if(baseTrust>.45&&a.stress>45)b.stress=Math.max(0,b.stress-2);
-  }
-  beliefLabel(key){return ({'cinder-anomaly':'problemas em Cinder Lake','east-radiation':'radiação a leste','violent-incidents':'ataques violentos','radio-active':'a rádio KACR','shelter-open':'um abrigo em formação','hospital-overflow':'o hospital lotado','emergency-traffic':'chamados de emergência'})[key]||'o que está acontecendo';}
-
-  updateRadio(totalMinutes){
-    const slot=Math.floor(totalMinutes/45);if(slot===this.lastRadioSlot)return;this.lastRadioSlot=slot;
-    const station=this.buildings.find(b=>b.type==='radio');if(!station||!station.power||this.infrastructure<.18)return;
-    const staff=this.agents.filter(a=>a.alive&&!a.turned&&dist(a,{x:station.x+station.w/2,y:station.y+station.h/2})<90&&(a.job==='radialista'||a.sociability>.68));
-    if(!staff.length&&slot>11)return;
-    let belief='violent-incidents',text='KACR pede que moradores evitem deslocamentos desnecessários.';
-    if(this.radAverage()>.08){belief='east-radiation';text='KACR transmite alerta incompleto sobre contaminação vinda do leste.';}
-    if(this.infrastructure<.58){belief='shelter-open';text='KACR compartilha relatos de abrigos improvisados e falhas de infraestrutura.';}
-    if(this.agents.filter(a=>a.alive&&!a.turned&&a.health<60).length>18){belief='hospital-overflow';text='KACR relata saturação do Hospital Municipal.';}
-    this.log(this.timeText(),'KACR 91.7',text);
-    for(const a of this.agents)if(a.alive&&!a.turned&&a.hasRadio&&this.rng.chance(.62)){a.beliefs.add(belief);a.radioKnowledge=clamp(a.radioKnowledge+.16,0,1);}
-  }
-
-  updateCorpses(minutes){
-    for(const c of this.corpses){
-      c.age+=minutes;
-      if(c.infected&&!c.reanimated&&c.age>=c.reanimateAt){
-        c.reanimated=true;
-        const z={kind:'zombie',source:c.source,id:`corpse-${c.source.id}-${Math.floor(this.totalTime())}`,name:c.name,x:c.x,y:c.y,target:this.randomRoadPoint(),alive:true,health:this.rng.range(42,68),mutation:clamp((c.source.radiation||0)/150,0,.55),decay:.08};
-        this.zombies.push(z);this.log(this.timeText(),'REANIMAÇÃO',`${c.name} volta a se mover após a morte.`,true);
-      }
-    }
-  }
-
-  totalTime(){return (this.day-1)*1440+this.time;}
-  timeText(){const h=Math.floor(this.time/60)%24,m=Math.floor(this.time%60);return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;}
-  radAverage(){let s=0;for(let i=0;i<this.rad.length;i++)s+=this.rad[i];return s/this.rad.length;}
-
-  log(time,type,text,important=false){
-    const e={id:this.nextEventId++
+ advanceAction(p,dt){
+   const a=p.action;if(!a)return;
+   if(['move','go_to','flee','npc_seek','npc_wander','npc_flee','reflex_flee'].includes(a.tool)||a.args?._phase==='approach'){
+     if(!p.target){p.action=null;return}const dx=p.target.x-p.x,dy=p.target.y-p.y,d=Math.hypot(dx,dy);if(d<16){if(a.tool==='npc_seek')this.npcScavenge(p,a.args.site_id);p.action=null;p.target=null;p.brain.nextDecision=Math.min(p.brain.nextDecision,this.minute+1);return}
+     const carry=this.inventoryWeight(p)/Math.max(1,this.maxCarry(p)),speed=(36+p.attr.agility*2.4)*(1-AZ.clamp(carry-.7,0,.6))*(p.energy<15?.65:1);const step=Math.min(d,speed*dt);p.x+=dx/d*step;p.y+=dy/d*step;p.energy=AZ.clamp(p.energy-dt*.012,0,100);
+     // If approaching a tool target, switch to execution at arrival.
+     if(d<70&&a.args?._phase==='approach'){delete a.args._phase;const tool=a.tool;p.action=null;this.executeAgentTool(p,tool,a.args,{model:a.model});}
+     return;
+   }
+   a.progress+=(dt/Math.max(.01,a.duration));
+   if(a.tool==='rest'){p.energy=AZ.clamp(p.energy+dt*.18,0,100);p.stress=AZ.clamp(p.stress-dt*.045,0,100)}
+   if(a.progress<1)return;this.finishAction(p,a);p.action=null;p.brain.nextDecision=Math.min(p.brain.nextDecision,this.minute+1);
+ }
+ finishAction(p,a){
+   if(a.tool==='scavenge'){
+     const s=this.findSiteById(a.args.site_id);if(!s)return;const available=s.loot.filter(i=>i.qty>0);if(!available.length){this.remember(p,'scavenge',`Vasculhou ${s.type}, mas não encontrou nada útil.`,4,['scavenge',s.id]);return}
+     const wanted=String(a.args.wanted||'').toLowerCase();let item=available.find(i=>i.name.toLowerCase().includes(wanted)||i.kind.includes(wanted)||i.id.includes(wanted))||this.rng.pick(available);const can=Math.max(0,this.maxCarry(p)-this.inventoryWeight(p));const qty=Math.min(item.qty,Math.max(1,Math.floor(can/Math.max(.1,item.weight||.5))),this.rng.int(1,3));if(qty<=0){this.remember(p,'scavenge','Não conseguiu carregar mais peso.',3,['scavenge']);return}item.qty-=qty;s.dirty=true;this.addItem(p,item,qty);this.remember(p,'scavenge',`Encontrou ${qty}× ${item.name} em ${s.type}.`,6,['s
