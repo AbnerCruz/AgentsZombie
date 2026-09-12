@@ -1,0 +1,7 @@
+'use strict';
+(()=>{
+const sim=window.sim,AZ=window.AZ,V=window.AZV8,ai=sim?.ai;if(!sim||!AZ||!V||!ai)return;
+const E=ai.economy=ai.economy||{};E.version='0.10.0';E.events=E.events||[];E.sessionStarted=E.sessionStarted||Date.now();E.softTarget=280;E.lastAlert=0;
+E.guard=E.guard||{enabled:localStorage.getItem('az_guard_enabled')==='1',maxCallsPerDay:+localStorage.getItem('az_guard_calls')||0,maxCostPerDay:+localStorage.getItem('az_guard_cost')||0};
+const cheap='qwen/qwen3-30b-a3b-instruct-2507';if(!ai.lightModel||ai.lightModel==='openai/gpt-oss-20b'){ai.lightModel=cheap;localStorage.setItem('az_light_model',cheap)}ai.socialModel=localStorage.getItem('az_social_model')||cheap;localStorage.setItem('az_social_model',ai.socialModel);if(!ai.deepModel)ai.deepModel='openai/gpt-oss-20b';
+const baseUsage=ai.accountUsage.bind(ai),baseDecide=ai.decide.bind(ai);
