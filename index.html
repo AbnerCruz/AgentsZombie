@@ -11,7 +11,6 @@
 <body>
   <main id="app">
     <canvas id="world" aria-label="Simulação do mundo"></canvas>
-
     <header class="topbar glass">
       <div class="brand"><b>ASHFALL</b><span id="clock">DIA 1 · 07:00</span></div>
       <div class="stats">
@@ -21,7 +20,6 @@
       </div>
       <button id="menuBtn" class="iconBtn" aria-label="Abrir painel">☰</button>
     </header>
-
     <nav class="timebar glass" aria-label="Controles de tempo">
       <button id="pauseBtn" class="iconBtn active">Ⅱ</button>
       <button class="speed active" data-speed="1">1×</button>
@@ -30,26 +28,22 @@
       <button class="speed" data-speed="64">64×</button>
       <button id="centerBtn" class="iconBtn" title="Centralizar seleção">◎</button>
     </nav>
-
     <aside id="drawer" class="drawer glass" aria-hidden="true">
       <div class="drawerHead">
-        <div><b>OBSERVATÓRIO</b><small>v0.5 · cérebros independentes</small></div>
+        <div><b>OBSERVATÓRIO</b><small>v0.6 · sandbox procedural</small></div>
         <button id="closeDrawer" class="iconBtn">×</button>
       </div>
-
       <div class="tabs">
         <button class="tab active" data-tab="inspect">Pessoa</button>
         <button class="tab" data-tab="ai">IA</button>
         <button class="tab" data-tab="worldtab">Mundo</button>
         <button class="tab" data-tab="log">Registro</button>
       </div>
-
       <section class="panel active" id="inspectPanel">
         <input id="search" class="field" placeholder="Buscar pessoa..." autocomplete="off" />
         <div id="searchResults" class="searchResults"></div>
         <div id="inspector" class="emptyState">Toque em uma pessoa, construção ou veículo no mapa.</div>
       </section>
-
       <section class="panel" id="aiPanel">
         <div class="notice">A chave OpenRouter é usada diretamente pelo navegador e armazenada apenas neste dispositivo. Em hospedagem estática, ela não pode ser mantida secreta do próprio navegador.</div>
         <label>OpenRouter API Key<input id="apiKey" class="field" type="password" placeholder="sk-or-v1-..." autocomplete="off" /></label>
@@ -65,7 +59,6 @@
         <label class="switch"><input id="aiEnabled" type="checkbox" checked /><span>Agentes de IA ativos</span></label>
         <p class="hint">Cada agente possui um ciclo independente de cérebro: não existe fila global. Sem API configurada, ele mantém apenas reflexos físicos imediatos. NPCs, militares e zumbis não consomem API.</p>
       </section>
-
       <section class="panel" id="worldtabPanel">
         <div class="meterBlock">
           <div><span>Seed</span><b id="seedLabel"></b></div>
@@ -79,15 +72,11 @@
         <button id="newWorld" class="danger">Nova simulação · Dia 1</button>
         <p class="hint">O terreno é gerado deterministicamente por chunks conforme a câmera e os habitantes exploram. O mapa não possui borda lógica.</p>
       </section>
-
-      <section class="panel" id="logPanel">
-        <div id="timeline" class="timeline"></div>
-      </section>
+      <section class="panel" id="logPanel"><div id="timeline" class="timeline"></div></section>
     </aside>
-
     <section id="agentCard" class="agentCard glass hidden"></section>
     <div id="toast" class="toast"></div>
   </main>
-  <script src="loader.js?v=05"></script>
+  <script src="loader.js?v=06"></script>
 </body>
 </html>
