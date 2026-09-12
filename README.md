@@ -1,22 +1,22 @@
-# Ashfall County v0.6
+# Ashfall County v0.6.1
 
 Simulação observacional mobile-first de apocalipse zumbi e radioativo, sem personagem do jogador.
 
+## v0.6.1
+
+- corrige congelamento do canvas ao tocar no chão depois de seguir uma pessoa selecionada;
+- cancela follow ao iniciar interação manual e recupera ponteiros presos no Android;
+- impede o renderer de seguir uma seleção nula;
+- elimina loops de `go_to` quando o agente já chegou ao destino;
+- adiciona estado espacial explícito de local atual ao cérebro;
+- deduplica a fila de tarefas e descarta tarefas que perderam a utilidade;
+- limita planejamento antecipado a uma próxima tarefa válida, reduzindo chamadas inúteis;
+- restaura contexto explícito de veículo ocupado para o cérebro;
+- aproxima automaticamente o agente ao tentar entrar ou abastecer um veículo percebido;
+- veículos trancados passam por tentativa física de entrada/partida influenciada por Mecânica e Intelecto;
+- `move` e `go_to` enquanto o agente ocupa um veículo podem ser executados como deslocamento veicular;
+- remove memórias legadas do tipo `thought` já existentes na sessão.
+
 ## v0.6
 
-- ranking de kills clicável, com redirecionamento para a inspeção e câmera do personagem;
-- sensores separados de visão, audição e ruído próprio;
-- campo de visão direcional e oclusão simplificada por construções;
-- sistema de ruído que afeta percepção e também pode atrair infectados;
-- redução forte de meta-informação: o cérebro não recebe uma coleção chamada `zombies`, percentuais internos de infecção/radiação ou relações numéricas;
-- pensamento atual deixa de ser salvo como memória duplicada;
-- cérebro pode planejar a próxima tarefa enquanto o corpo continua executando a atual;
-- fila de tarefas por agente, mostrada na inspeção;
-- crafting conhecido por personagem com materiais, duração, prática de habilidade e fila;
-- novos itens improvisados e armas simples;
-- feedback de hit com flash, impacto, sangue e dano;
-- contagem de kills em combate e por veículo;
-- métricas OpenRouter sincronizadas automaticamente, sem botão de atualização;
-- Management Key e API Key continuam armazenadas apenas no dispositivo.
-
-A base da v0.5 permanece: 30 agentes independentes via OpenRouter, NPCs, militares, zumbis, mundo procedural infinito, veículos, gasolina, construção, relações sociais, habilidades por prática, memória experiencial e explosão da usina no Dia 3.
+Mantém ranking de kills clicável, sensores de visão/audição/ruído, crafting, fila de tarefas, combate aprimorado, memória epistemológica, métricas OpenRouter automáticas, 30 agentes independentes, NPCs, militares, zumbis, mundo procedural infinito, veículos, gasolina, construção, habilidades por prática e explosão da usina no Dia 3.
