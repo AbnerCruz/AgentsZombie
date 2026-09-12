@@ -1,0 +1,23 @@
+'use strict';
+(()=>{
+const sim=window.sim,AZ=window.AZ,V=window.AZV8;if(!sim||!AZ||!V||!sim.ai)return;const clamp=AZ.clamp,ai=sim.ai;
+const S=sim.social=sim.social||{};S.version='0.10.0';S.scenes=S.scenes||[];S.pending=S.pending||new Map();S.groupHistory=S.groupHistory||[];S.groups=S.groups||[];S.sceneSeq=S.sceneSeq||0;
+const oldSocial=V.social;
+V.social=function(a,b){const s=oldSocial(a,b);if(!Number.isFinite(s.respect))s.respect=0;if(!Number.isFinite(s.sharedTime))s.sharedTime=0;if(!Number.isFinite(s.cooperation))s.cooperation=0;if(!(s.knownBeliefs instanceof Set))s.knownBeliefs=new Set(s.knownBeliefs||[]);s.promises=s.promises||[];s.estimatedKnowledge=s.estimatedKnowledge||{};return s};
+function ensure(p){V.ensurePerson(p);p.reputation=p.reputation||new Map();p.promises=p.promises||[];p.socialObservations=p.socialObservations||[];return p}
+for(const p of sim.people)ensure(p);
+const oldMake=sim.makePerson.bind(sim);sim.makePerson=function(...args){const p=oldMake(...args);ensure(p);return p};
+function axis(a,b){return V.social(a,b)}
+function pairKey(a,b){return[a.id,b.id].sort().join('|')}
+function qrel(v){return V.qual?.relation?V.qual.relation(v):v}
+function personState(p){ensure(p);return{id:p.id,name:p.name,age:p.age,profession:p.profession,personality:p.personality,goal:p.brain?.goal||null,current_intention:sim.serializeIntent?.(p.brain?.intent)||null,condition:sim.publicCondition?.(p)||null,armed:!!p.equippedWeapon,weapon:p.equippedWeapon||null,stress:Math.round(p.stress||0),wounds:(p.wounds||[]).length,beliefs:[...p.beliefs.values()].sort((a,b)=>(b.confidence||0)-(a.confidence||0)).slice(0,8).map(x=>({key:x.key,content:x.content,confidence:V.qual.confidence(x.confidence),source:x.firsthand?'experiência direta':x.source})),inventory:(p.inventory||[]).slice(0,18).map(i=>({id:i.id,name:i.name,kind:i.kind,qty:i.qty}))}}
+function relationView(a,b){const s=axis(a,b);return{affinity:qrel(s.affinity),trust:qrel(s.trust),debt:Math.round(s.debt||0),fear:Math.round(s.fear||0),familiarity:Math.round(s.familiarity||0),respect:qrel(s.respect||0),estimated_goal:s.estimatedGoal||null}}
+function sceneContext(parts,seed){const site=sim.currentSite?.(parts[0]);return{time:sim.timeLabel?.()||'',place:site?{id:site.id,name:site.name,type:site.type}:null,physical_context:{light:sim.world?.lightingAt?sim.world.lightingAt(parts[0].x,parts[0].y,sim.minute):null},seed,participants:parts.map(p=>({self:personState(p),relations:Object.fromEntries(parts.filter(q=>q!==p).map(q=>[q.id,relationView(p,q)]))}))}}
+function schema(){
+  return {
+    name:'ashfall_social_scene',
+    strict:true,
+    schema:{
+      type:'object', additionalProperties:false,
+      required:['turns','relation_changes','belief_updates','theory_updates','vocabulary_updates','outcome','promises','deceptions','reputation'],
+      properties:{

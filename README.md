@@ -1,4 +1,35 @@
-# Ashfall County v0.9
+# Ashfall County v0.10.0 — Sociedade Emergente + Economia Cognitiva
+
+A v0.10 parte da base física v0.9 e desloca o orçamento de IA para onde o modelo é realmente insubstituível: interação social, negociação, informação e decisões significativas.
+
+## Social
+
+- relações em seis eixos: afinidade, confiança, dívida, medo, familiaridade e respeito;
+- conversa resolvida como cena única de 2–5 participantes, com vários turnos e um único request;
+- cenas retornam fatos transmitidos, mudanças de relação, promessas, mentiras/omissões, reputação e desfecho;
+- falar não implica acreditar: decepções podem ser aceitas por ouvintes confiantes e depois contraditas pela experiência;
+- reputação/fofoca usa o mesmo motor de crenças com fonte e confiança;
+- teoria da mente mínima mantém objetivo estimado, familiaridade e conhecimento atribuído ao outro;
+- comportamento observado sem diálogo altera familiaridade, respeito e medo sem gastar token;
+- grupos não são criados por comando: são inferidos de convivência, familiaridade, confiança e cooperação;
+- liderança é percepção agregada de respeito/confiança/competência, não cargo fixo;
+- promessas podem ser cumpridas ou quebradas e afetam confiança/reputação;
+- troca preserva o objeto original do item, corrigindo o bug que convertia armas e itens em `misc`;
+- negociação pode aceitar, recusar ou contrapropor e pode gerar dívida/fiado.
+
+## Economia de IA
+
+- planejamento continua dirigido por evento e nunca é necessário para o corpo continuar se movendo;
+- schemas são escolhidos por situação, em vez de enviar todas as ferramentas em toda chamada;
+- contexto é ordenado em estável → memória/modelo social → estado atual, favorecendo reutilização de prefixo/cache;
+- hash perceptivo deduplica replanejamentos quando nada material mudou;
+- modelo profundo dispara por significado: primeiro contato, morte próxima, promessa quebrada, ruptura, ferimento decisivo etc.;
+- modelo leve/social padrão: `qwen/qwen3-30b-a3b-instruct-2507`; modelo profundo mantém `openai/gpt-oss-20b`;
+- métricas automáticas incluem chamadas/dia simulado, projeção/dia, custo/dia, queima estimada/hora, cenas sociais e alertas;
+- proteção de gasto é opcional e desligada por padrão. Com ela desligada, o simulador continua usando livremente o saldo da OpenRouter.
+
+## Base herdada
+
 
 Simulação observacional mobile-first de colapso social, mortos-vivos e desastre radiológico. Não existe personagem do jogador: o observador acompanha um mundo autônomo.
 
