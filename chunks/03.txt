@@ -1,0 +1,82 @@
+aos + (pressure*.004 + dayOneRamp*.0015)*dt - .0004*dt,0,1);
+    this.infrastructure=clamp(this.infrastructure-(this.chaos*.00042+zombies*.0000025)*minutes,0,1);
+
+    // Radiation plume diffuses slowly with wind. A damaged plant worsens during first day.
+    const plant=this.buildings.find(b=>b.type==='plant');
+    const px=Math.floor((plant.x+plant.w/2)/this.tile),py=Math.floor((plant.y+plant.h/2)/this.tile);
+    const release = totalMinutes<1100 ? .00065 : .00022;
+    for(let k=0;k<6;k++){
+      const x=clamp(px+this.rng.int(-3,3),0,this.W-1), y=clamp(py+this.rng.int(-3,3),0,this.H-1);
+      this.rad[this.idx(x,y)]=clamp(this.rad[this.idx(x,y)]+release*minutes*6,0,1);
+    }
+    if(this.rng.chance(.03*dt)){
+      const old=this.rad.slice();
+      for(let y=1;y<this.H-1;y++) for(let x=1;x<this.W-1;x++){
+        const i=this.idx(x,y); const upwindX=clamp(Math.round(x-this.wind.x),0,this.W-1),upwindY=clamp(Math.round(y-this.wind.y),0,this.H-1);
+        const avg=(old[i]*5+old[this.idx(x-1,y)]+old[this.idx(x+1,y)]+old[this.idx(x,y-1)]+old[this.idx(x,y+1)]+old[this.idx(upwindX,upwindY)]*2)/11;
+        this.rad[i]=clamp(avg*.9998,0,1);
+      }
+    }
+
+    // Organic fire outbreaks become more likely as infrastructure collapses.
+    if(this.rng.chance((.0003+this.chaos*.0018)*dt)){
+      const x=this.rng.int(8,this.W-9),y=this.rng.int(8,this.H-9); if(this.tiles[this.idx(x,y)].type!=='water'){this.fire[this.idx(x,y)]=1;this.log(this.timeText(),'INCÊNDIO',`Fogo avistado no setor ${String.fromCharCode(65+Math.floor(x/20))}-${Math.floor(y/15)+1}.`);}
+    }
+    for(let i=0;i<this.fire.length;i++) if(this.fire[i]>0){this.fire[i]=Math.max(0,this.fire[i]-dt*.0015); if(this.rng.chance(.002*dt)&&this.fire[i]>.5){const x=i%this.W,y=Math.floor(i/this.W);const nx=clamp(x+this.rng.int(-1,1),0,this.W-1),ny=clamp(y+this.rng.int(-1,1),0,this.H-1);if(this.tiles[this.idx(nx,ny)].type!=='water')this.fire[this.idx(nx,ny)]=Math.max(this.fire[this.idx(nx,ny)],.55);}}
+
+    this.updateRadio(totalMinutes);
+
+    // World-state broadcasts are consequences of thresholds, not a fixed timeline.
+    if(this.infrastructure<.72&&!this.flagPower){this.flagPower=true;this.log(this.timeText(),'REDE ELÉTRICA','Quedas de energia se espalham pela cidade.',true);this.buildings.forEach(b=>{if(this.rng.chance(.42))b.power=false;});}
+    if(this.chaos>.48&&!this.flagLoot){this.flagLoot=true;this.log(this.timeText(),'ORDEM PÚBLICA','A polícia deixa de responder a parte das chamadas. Saques são relatados.',true);}
+    if(this.radAverage()>.13&&!this.flagRad){this.flagRad=true;this.log(this.timeText(),'RADIAÇÃO','A pluma de Cinder Lake alcança áreas residenciais.',true);}
+  }
+
+  updateHuman(a,dt,minutes){
+    a.hunger=clamp(a.hunger+minutes*.022,0,100);a.thirst=clamp(a.thirst+minutes*.032,0,100);a.fatigue=clamp(a.fatigue+minutes*.018,0,100);
+    const rad=this.radAt(a.x,a.y); a.radiation=clamp(a.radiation+rad*minutes*.014,0,100);
+    if(rad>.18)a.stress=clamp(a.stress+rad*minutes*.03,0,100);
+    if(a.radiation>55)a.health-=minutes*(a.radiation-50)*.0009;
+    if(a.hunger>82)a.health-=minutes*.018;if(a.thirst>78)a.health-=minutes*.032;
+    if(a.infection>0){a.infection=clamp(a.infection+minutes*(.00062+.00034*(a.health<55)),0,1.2);a.health-=minutes*a.infection*.006;a.stress=clamp(a.stress+minutes*a.infection*.01,0,100);}
+    if(a.infection>=1){this.turn(a);return;} if(a.health<=0){this.killHuman(a,'ferimentos e colapso físico');return;}
+
+    // Perception.
+    const dangerZ=this.nearestZombie(a,95);
+    if(dangerZ){a.knownDanger=clamp(a.knownDanger+.25,0,1);a.stress=clamp(a.stress+minutes*.12,0,100); if(dist(a,dangerZ)<17){this.zombieAttack(dangerZ,a,dt);}}
+    else a.knownDanger=Math.max(0,a.knownDanger-dt*.01);
+    const nearbyHuman=this.nearestHuman(a,48);
+    if(nearbyHuman && a.stress>55 && a.sociability>.45){a.stress=Math.max(0,a.stress-minutes*.018);}
+    a.socialCooldown-=dt;
+    if(nearbyHuman && !dangerZ && a.socialCooldown<=0){this.socialExchange(a,nearbyHuman);a.socialCooldown=this.rng.range(8,24);}
+
+    a.decisionIn-=dt;
+    if(a.decisionIn<=0){this.decide(a);a.decisionIn=a.cognitive==='agent'?this.rng.range(.8,2.8):this.rng.range(2.2,5.5);}
+    this.moveHuman(a,dt,dangerZ);
+    this.interactAtTarget(a,dt,minutes);
+  }
+
+  decide(a){
+    const scores={};
+    const rad=this.radAt(a.x,a.y), danger=this.nearestZombie(a,82);
+    scores.escapeRadiation=rad*130 + (a.radiation>45?30:0);
+    scores.flee=danger ? 95-clamp(dist(a,danger),0,95)+a.stress*.25 : 0;
+    scores.water=a.thirst*.95 + (a.water===0?12:0);
+    scores.food=a.hunger*.78 + (a.food===0?8:0);
+    scores.medical=(100-a.health)*.65 + a.infection*42 + (a.radiation>45?22:0);
+    scores.rest=a.fatigue*.56;
+    const missingFamily=a.family.map(id=>this.personById(id)).filter(f=>f&&f.alive&&!f.turned&&dist(a,f)>90);
+    scores.group=missingFamily.length ? 22+a.sociability*28+a.stress*.22 : a.sociability*8;
+    const injured=this.nearestHuman(a,75,h=>h.health<55||h.infection>.35);
+    scores.help=injured ? a.empathy*55+(a.job==='médico'||a.job==='enfermeira'?30:0)-a.stress*.25 : 0;
+    scores.shelter=this.chaos*38+a.stress*.25+(this.infrastructure<.5?12:0);
+    scores.scavenge=(a.food+a.water<3?26:8)+this.chaos*12;
+    scores.home=(a.family.length?18:7)+a.stress*.16;
+    scores.radio=(a.radioKnowledge<.5&&a.sociability>.45)?12+this.chaos*20:0;
+    scores.wander=6;
+    if(a.trait==='protetor')scores.help+=12;if(a.trait==='corajoso')scores.flee-=8;if(a.trait==='ansioso')scores.flee+=14;if(a.trait==='pragmático'){scores.food+=5;scores.water+=5;scores.shelter+=5}if(a.trait==='solitário')scores.group-=14;if(a.trait==='altruísta')scores.help+=15;
+    if(a.beliefs.has('shelter-open'))scores.shelter+=11;
+    if(a.beliefs.has('hospital-overflow'))scores.medical-=8;
+    if(a.beliefs.has('east-radiation')||a.beliefs.has('cinder-anomaly'))scores.escapeRadiation+=rad*18;
+    if(a.group&&a.group.leaderId!==a.id&&a.group.base)scores.shelter+=a.group.cohesion*14;
+    // Full cognitive agents main

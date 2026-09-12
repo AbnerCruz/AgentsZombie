@@ -1,0 +1,52 @@
+,time,type,text,important};this.events.unshift(e);if(this.events.length>120)this.events.pop();
+    const feed=$('eventFeed');if(feed){const row=document.createElement('div');row.className='event';row.innerHTML=`<time>${time}</time><span><strong>${type}</strong> · ${text}</span>`;feed.prepend(row);while(feed.children.length>40)feed.lastChild.remove();}
+  }
+
+  refreshHUD(){
+    const living=this.agents.filter(a=>a.alive&&!a.turned).length, infected=this.agents.filter(a=>a.alive&&!a.turned&&a.infection>.05).length, dead=this.agents.filter(a=>!a.alive).length, zombies=this.zombies.filter(z=>z.alive).length;
+    $('aliveStat').textContent=living;$('infectedStat').textContent=infected;$('deadStat').textContent=dead;$('zombieStat').textContent=zombies;
+    $('clock').textContent=`DIA ${this.day} · ${this.timeText()}`;
+    const rav=this.radAverage(); $('chaosText').textContent=Math.round(this.chaos*100)+'%';$('chaosBar').style.width=this.chaos*100+'%';$('radText').textContent=Math.round(rav*100)+'%';$('radBar').style.width=rav*100+'%';$('infraText').textContent=Math.round(this.infrastructure*100)+'%';$('infraBar').style.width=this.infrastructure*100+'%';
+    if(this.selected && this._lastInspectorTick!==(Math.floor(performance.now()/600))){this._lastInspectorTick=Math.floor(performance.now()/600);this.renderInspector();}
+  }
+
+  renderInspector(){
+    const box=$('inspector'),o=this.selected;if(!o){box.innerHTML='<div class="emptyState"><h2>OBSERVADOR</h2><p>Toque em uma pessoa, zumbi ou ponto da cidade para acompanhar.</p></div>';return;}
+    if(o.kind==='human'){
+      const status=!o.alive?'Morto':o.turned?'Transformado':o.infection>.05?'Infectado':'Sobrevivente';
+      const fam=o.family.map(id=>this.agents[id-1]).filter(Boolean).map(x=>x.name.split(' ')[0]).join(', ')||'—';
+      box.innerHTML=`<h2>INDIVÍDUO #${o.id}</h2><div class="inspectName">${o.name}</div><span class="pill">${status}</span><span class="pill">${o.job}</span><span class="pill">${o.trait}</span>
+      <div class="kv"><span>Idade</span><b>${o.age}</b><span>Saúde</span><b>${Math.round(o.health)}%</b><span>Infecção</span><b>${Math.round(o.infection*100)}%</b><span>Radiação acumulada</span><b>${Math.round(o.radiation)}%</b><span>Estresse</span><b>${Math.round(o.stress)}%</b><span>Fome / sede</span><b>${Math.round(o.hunger)} / ${Math.round(o.thirst)}</b><span>Família próxima</span><b>${fam}</b><span>Grupo</span><b>${o.group?o.group.name:'—'}</b><span>Liderança do grupo</span><b>${o.group&&o.group.leaderId===o.id?'sim':'—'}</b><span>Informações conhecidas</span><b>${o.beliefs.size}</b></div>
+      <div class="thought">Agora: ${ACTION_LABEL[o.action]||o.action}. ${o.knownDanger>.5?'Percebe perigo imediato nas proximidades.':''}</div>
+      <h2 style="margin-top:14px">MEMÓRIA RECENTE</h2>${(o.memories.length?o.memories:['Nenhuma memória marcante registrada ainda.']).map(m=>`<div class="memory">${m}</div>`).join('')}
+      <button class="followBtn" id="followSelected">${this.follow===o?'SEGUINDO':'ACOMPANHAR'}</button>`;
+    } else if(o.kind==='zombie'){
+      box.innerHTML=`<h2>INFECTADO</h2><div class="inspectName">${o.name||'Desconhecido'}</div><span class="pill">zumbi</span>${o.source?'<span class="pill">ex-cidadão</span>':''}<div class="kv"><span>Integridade</span><b>${Math.max(0,Math.round(o.health))}%</b><span>Mutação</span><b>${Math.round(o.mutation*100)}%</b><span>Radiação local</span><b>${Math.round(this.radAt(o.x,o.y)*100)}%</b></div><div class="thought">Comportamento orientado por estímulos próximos e busca por alvos vivos.</div><button class="followBtn" id="followSelected">${this.follow===o?'SEGUINDO':'ACOMPANHAR'}</button>`;
+    } else if(o.kind==='building'){
+      const b=o.data;box.innerHTML=`<h2>LOCAL</h2><div class="inspectName">${b.name}</div><span class="pill">${b.type}</span><div class="kv"><span>Comida</span><b>${Math.round(b.food)}</b><span>Água</span><b>${Math.round(b.water)}</b><span>Medicamentos</span><b>${Math.round(b.meds)}</b><span>Fortificação</span><b>${Math.round(b.fort*100)}%</b><span>Energia</span><b>${b.power?'sim':'não'}</b><span>Radiação</span><b>${Math.round(this.radAt(b.x+b.w/2,b.y+b.h/2)*100)}%</b></div>`;
+    }
+    const f=$('followSelected');if(f)f.onclick=()=>{this.follow=o;this.renderInspector();};
+  }
+
+  selectAt(sx,sy){
+    const p=this.screenToWorld(sx,sy);let best=null,bd=16/this.camera.zoom;
+    for(const a of this.agents){if(!a.alive||a.turned)continue;const d=Math.hypot(a.x-p.x,a.y-p.y);if(d<bd){bd=d;best=a;}}
+    for(const z of this.zombies){if(!z.alive)continue;const d=Math.hypot(z.x-p.x,z.y-p.y);if(d<bd){bd=d;best=z;}}
+    if(!best){const b=this.buildingAt(p.x,p.y);if(b)best={kind:'building',data:b};}
+    this.selected=best;this.renderInspector();
+  }
+
+  screenToWorld(sx,sy){const rect=canvas.getBoundingClientRect();const x=(sx-rect.left-rect.width/2)/this.camera.zoom+this.camera.x,y=(sy-rect.top-rect.height/2)/this.camera.zoom+this.camera.y;return{x,y};}
+
+  draw(){
+    const dpr=this.dpr||1,w=canvas.width,h=canvas.height;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle='#0b100d';ctx.fillRect(0,0,w/dpr,h/dpr);
+    ctx.save();ctx.translate(innerWidth/2,innerHeight/2);ctx.scale(this.camera.zoom,this.camera.zoom);ctx.translate(-this.camera.x,-this.camera.y);
+    const vw=innerWidth/this.camera.zoom,vh=innerHeight/this.camera.zoom;const minX=clamp(Math.floor((this.camera.x-vw/2)/this.tile)-2,0,this.W),maxX=clamp(Math.ceil((this.camera.x+vw/2)/this.tile)+2,0,this.W),minY=clamp(Math.floor((this.camera.y-vh/2)/this.tile)-2,0,this.H),maxY=clamp(Math.ceil((this.camera.y+vh/2)/this.tile)+2,0,this.H);
+    for(let y=minY;y<maxY;y++)for(let x=minX;x<maxX;x++)this.drawTile(x,y,this.tiles[this.idx(x,y)]);
+    this.drawBuildings();
+    if(this.overlayTerritory)this.drawGroups();
+    if(this.overlayPath)this.drawPaths();
+    this.drawCorpses();
+    for(const a of this.agents)if(a.alive&&!a.turned)this.drawHuman(a);
+    for(const z of this.zombies)if(z.alive)this.drawZombie(z);
+    this.drawFire

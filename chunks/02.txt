@@ -1,0 +1,79 @@
+7,23).forEach(a=>a.beliefs.add('violent-incidents'));
+    shuffled.slice(23,34).forEach(a=>a.beliefs.add('cinder-anomaly'));
+    shuffled.slice(34,52).forEach(a=>a.beliefs.add('radio-active'));
+
+    // A handful of already-turned people ignite the first visible panic without defining the future.
+    const outbreakPoints=[{x:76*this.tile,y:31*this.tile},{x:53*this.tile,y:31*this.tile},{x:89*this.tile,y:31*this.tile},{x:64*this.tile,y:55*this.tile},{x:33*this.tile,y:32*this.tile},{x:21*this.tile,y:28*this.tile}];
+    outbreakPoints.forEach((p,i)=>this.zombies.push({kind:'zombie',source:null,id:`outbreak-${i+1}`,name:'Pessoa não identificada',x:p.x+this.rng.range(-18,18),y:p.y+this.rng.range(-18,18),target:this.randomRoadPoint(),alive:true,health:this.rng.range(58,84),mutation:this.rng.range(0,.08),decay:0}));
+
+    this.log('07:00','EMERGÊNCIA','Sirene civil interrompe a manhã. A rede móvel começa a ficar instável.',true);
+    this.log('07:03','RÁDIO','KACR relata incidentes violentos sem causa confirmada no condado.',true);
+    this.log('07:07','CINDER LAKE','Sensores registram liberação anormal no complexo nuclear a leste.',true);
+  }
+
+  bindUI(){
+    $('pauseBtn').onclick=()=>{this.paused=!this.paused;$('pauseBtn').textContent=this.paused?'▶':'Ⅱ';};
+    document.querySelectorAll('.speed').forEach(btn=>btn.onclick=()=>{this.speed=+btn.dataset.speed;document.querySelectorAll('.speed').forEach(b=>b.classList.toggle('active',b===btn));});
+    $('resetBtn').onclick=()=>{ if(confirm('Iniciar uma nova simulação no Dia 1?')) location.reload(); };
+    $('radToggle').onchange=e=>this.overlayRad=e.target.checked;
+    $('territoryToggle').onchange=e=>this.overlayTerritory=e.target.checked;
+    $('pathToggle').onchange=e=>this.overlayPath=e.target.checked;
+    $('clearFollow').onclick=()=>{this.follow=null;};
+    $('searchAgent').oninput=e=>this.search(e.target.value);
+
+    canvas.addEventListener('pointerdown',e=>{
+      canvas.setPointerCapture(e.pointerId); this.pointer.drag=true; this.pointer.moved=false; this.pointer.x=this.pointer.lastX=e.clientX;this.pointer.y=this.pointer.lastY=e.clientY;
+    });
+    canvas.addEventListener('pointermove',e=>{
+      if(!this.pointer.drag)return; const dx=e.clientX-this.pointer.lastX,dy=e.clientY-this.pointer.lastY;
+      if(Math.abs(e.clientX-this.pointer.x)+Math.abs(e.clientY-this.pointer.y)>6)this.pointer.moved=true;
+      if(!this.follow){this.camera.x-=dx/this.camera.zoom;this.camera.y-=dy/this.camera.zoom;}
+      this.pointer.lastX=e.clientX;this.pointer.lastY=e.clientY;
+    });
+    canvas.addEventListener('pointerup',e=>{if(!this.pointer.moved)this.selectAt(e.clientX,e.clientY);this.pointer.drag=false;});
+    canvas.addEventListener('wheel',e=>{e.preventDefault();const before=this.screenToWorld(e.clientX,e.clientY);this.camera.zoom=clamp(this.camera.zoom*(e.deltaY>0?.88:1.12),.32,2.7);const after=this.screenToWorld(e.clientX,e.clientY);this.camera.x+=before.x-after.x;this.camera.y+=before.y-after.y;},{passive:false});
+    canvas.addEventListener('touchstart',e=>{if(e.touches.length===2){const [a,b]=e.touches;this.pinch={d:Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY),z:this.camera.zoom};}},{passive:true});
+    canvas.addEventListener('touchmove',e=>{if(e.touches.length===2&&this.pinch){const [a,b]=e.touches;const d=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);this.camera.zoom=clamp(this.pinch.z*d/this.pinch.d,.32,2.7);}},{passive:true});
+    canvas.addEventListener('touchend',()=>this.pinch=null,{passive:true});
+  }
+
+  search(q){
+    q=q.trim().toLowerCase(); const box=$('searchResults'); box.innerHTML=''; if(!q)return;
+    this.agents.filter(a=>a.name.toLowerCase().includes(q)).slice(0,8).forEach(a=>{const d=document.createElement('div');d.className='searchItem';d.textContent=`${a.name} · ${a.alive?(a.turned?'zumbi':'vivo'):'morto'}`;d.onclick=()=>{const target=a.turned?(this.zombies.find(z=>z.source===a&&z.alive)||a):a;this.selected=target;this.follow=target;this.renderInspector();box.innerHTML='';$('searchAgent').value='';};box.appendChild(d);});
+  }
+
+  resize(){ const dpr=Math.min(devicePixelRatio||1,2); canvas.width=Math.floor(innerWidth*dpr);canvas.height=Math.floor(innerHeight*dpr);canvas.style.width=innerWidth+'px';canvas.style.height=innerHeight+'px';this.dpr=dpr; }
+
+  frame(now){
+    const dt=Math.min(.05,(now-this.last)/1000); this.last=now;
+    if(!this.paused){
+      this.simAccumulator += dt*this.speed;
+      let loops=0;
+      while(this.simAccumulator>=.20 && loops<80){this.step(.20);this.simAccumulator-=.20;loops++;}
+    }
+    if(this.follow && this.follow.alive!==false){this.camera.x=lerp(this.camera.x,this.follow.x,.08);this.camera.y=lerp(this.camera.y,this.follow.y,.08);}
+    this.draw(); this.refreshHUD();
+    requestAnimationFrame(t=>this.frame(t));
+  }
+
+  step(dt){
+    const minutes=dt*1.35; // 1 real simulation second ~= 6.75 game minutes at 1x.
+    this.time+=minutes;
+    while(this.time>=1440){this.time-=1440;this.day++;this.log(this.timeText(),'NOVO DIA',`O Dia ${this.day} começa com ${this.agents.filter(a=>a.alive&&!a.turned).length} sobreviventes.`,true);}
+    this.updateWorld(dt,minutes);
+    this.rebuildSpatial();
+    for(const a of this.agents) if(a.alive&&!a.turned) this.updateHuman(a,dt,minutes);
+    for(const z of this.zombies) if(z.alive) this.updateZombie(z,dt,minutes);
+    this.updateGroups(dt);
+    this.updateCorpses(minutes);
+  }
+
+  updateWorld(dt,minutes){
+    const totalMinutes=(this.day-1)*1440+this.time;
+    // Chaos is an emergent aggregate but the first day starts with failing institutions.
+    const zombies=this.zombies.filter(z=>z.alive).length;
+    const infected=this.agents.filter(a=>a.alive&&!a.turned&&a.infection>.05).length;
+    const deaths=this.agents.filter(a=>!a.alive).length;
+    const pop=Math.max(1,this.agents.length);const pressure=clamp(zombies/(pop*.20)+infected/(pop*.27)+deaths/(pop*.22),0,1);
+    const dayOneRamp=clamp((totalMinutes-420)/540,0,.52);
+    this.chaos=clamp(this.ch

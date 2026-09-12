@@ -1,0 +1,97 @@
+11],[92,40,11,11],[8,58,12,10],[28,58,12,10],[72,58,12,10],[92,58,11,10]].forEach(([sx,sy,w,h])=>{
+      for(let yy=sy;yy<sy+h;yy+=6) for(let xx=sx;xx<sx+w;xx+=7) if(this.rng.chance(.82)) homeSpots.push([xx,yy]);
+    });
+    homeSpots.slice(0,34).forEach((p,i)=>addBuilding('Casa '+(i+1),p[0],p[1],4,3,'home',6));
+    // Civic / commercial / survival points.
+    this.poi.push(addBuilding('Hospital Municipal',48,27,10,6,'hospital',35));
+    this.poi.push(addBuilding('Mercado Ashfall',71,27,9,6,'grocery',24));
+    this.poi.push(addBuilding('Escola Comunitária',27,27,10,6,'school',45));
+    this.poi.push(addBuilding('Delegacia',86,27,7,6,'police',18));
+    this.poi.push(addBuilding('Estação KACR 91.7',95,61,7,5,'radio',14));
+    this.poi.push(addBuilding('Corpo de Bombeiros',14,27,7,6,'fire',18));
+    this.poi.push(addBuilding('Oficina Oakes',48,59,8,5,'shop',12));
+    this.poi.push(addBuilding('Farmácia Central',60,27,6,5,'pharmacy',10));
+    this.poi.push(addBuilding('Fazenda Bell',14,72,12,7,'farm',16));
+    this.poi.push(addBuilding('Abrigo Municipal',81,72,10,6,'shelter',60));
+    this.poi.push(addBuilding('Complexo Nuclear Cinder Lake',106,5,10,9,'plant',25));
+    this.poi.push(addBuilding('Posto de Gasolina',60,59,7,5,'gas',12));
+
+    // Mark building floor footprints.
+    for(const b of this.buildings){
+      const sx=Math.floor(b.x/this.tile), sy=Math.floor(b.y/this.tile), w=Math.floor(b.w/this.tile),h=Math.floor(b.h/this.tile);
+      for(let y=sy;y<sy+h;y++) for(let x=sx;x<sx+w;x++) if(this.inBounds(x,y)) setTile(x,y,'lot');
+    }
+  }
+
+  createPopulation(agentCount,npcCount){
+    const n=agentCount+npcCount;
+    const homes=this.buildings.filter(b=>b.type==='home');
+    const workplaces=this.buildings.filter(b=>['hospital','grocery','school','police','radio','fire','shop','pharmacy','farm','gas'].includes(b.type));
+    const householdLast=[];
+    for(let i=0;i<homes.length;i++) householdLast[i]=this.rng.pick(LAST);
+    for(let i=0;i<n;i++){
+      const hIndex=i%homes.length;
+      const home=homes[hIndex];
+      const age=this.rng.int(8,84);
+      const job=age>67?'aposentado':age<18?'estudante':this.rng.pick(JOBS);
+      const work=this.findWorkplaceForJob(job,workplaces);
+      const cognitive=i<agentCount?'agent':'npc'; // Internal simulation detail; never exposed to inhabitants.
+      const a={
+        kind:'human',id:i+1,name:`${this.rng.pick(FIRST)} ${householdLast[hIndex]}`,age,job,trait:this.rng.pick(TRAITS),cognitive,
+        x:home.x+this.rng.range(8,home.w-8),y:home.y+this.rng.range(8,home.h-8),vx:0,vy:0,
+        home,work,health:100,hunger:this.rng.range(3,20),thirst:this.rng.range(2,18),fatigue:this.rng.range(2,22),stress:this.rng.range(4,18),radiation:0,infection:0,
+        courage:this.rng.range(.25,.85),empathy:this.rng.range(.25,.9),sociability:this.rng.range(.2,.95),awareness:this.rng.range(.3,.85),
+        leadership:this.rng.range(.15,.92),risk:this.rng.range(.15,.9),
+        food:this.rng.int(0,2),water:this.rng.int(0,2),meds:0,weapon:this.rng.chance(.12),hasRadio:this.rng.chance(.38),alive:true,turned:false,
+        action:'home',target:{x:home.x+home.w/2,y:home.y+home.h/2},group:null,memories:[],path:[],decisionIn:this.rng.range(0,.8),panic:false,knownDanger:0,radioKnowledge:0,lastBuilding:home,
+        family:[],kills:0,helped:0,beliefs:new Set(),rumors:[],relations:new Map(),socialCooldown:this.rng.range(2,12),goal:null
+      };
+      this.agents.push(a);
+    }
+    // Household relationships are real to everyone; nobody has access to simulation tiers.
+    for(const a of this.agents){
+      a.family=this.agents.filter(b=>b!==a&&b.home===a.home).map(b=>b.id);
+      for(const id of a.family)a.relations.set(id,this.rng.range(.58,.92));
+    }
+    this.seedMorningRoutine();
+  }
+
+  seedMorningRoutine(){
+    for(const a of this.agents){
+      const roll=this.rng.next();
+      if(a.work && roll<.38){
+        a.x=a.work.x+this.rng.range(8,Math.max(9,a.work.w-8));
+        a.y=a.work.y+this.rng.range(8,Math.max(9,a.work.h-8));
+        a.lastBuilding=a.work;
+        a.action='wander';
+      }else if(a.work && roll<.72){
+        const t=this.rng.range(.15,.85);
+        a.x=lerp(a.home.x+a.home.w/2,a.work.x+a.work.w/2,t)+this.rng.range(-20,20);
+        a.y=lerp(a.home.y+a.home.h/2,a.work.y+a.work.h/2,t)+this.rng.range(-20,20);
+        a.target={x:a.work.x+a.work.w/2,y:a.work.y+a.work.h/2};
+        a.action='wander';
+      }
+      if(a.job==='policial'||a.job==='bombeiro'||a.job==='enfermeira'||a.job==='médico')a.beliefs.add('emergency-traffic');
+      if(a.job==='radialista')a.beliefs.add('radio-active');
+      if(a.job==='técnica de laboratório'&&this.rng.chance(.55))a.beliefs.add('cinder-anomaly');
+    }
+  }
+
+  findWorkplaceForJob(job, workplaces){
+    const map={enfermeira:'hospital',médico:'hospital',professor:'school',policial:'police',bombeiro:'fire',radialista:'radio',mecânico:'shop',caixa:'grocery',farmacêutica:'pharmacy',fazendeiro:'farm',motorista:'gas',cozinheira:'grocery',segurança:'police','técnica de laboratório':'hospital',carpinteiro:'shop',estudante:'school'};
+    const t=map[job];
+    return workplaces.find(b=>b.type===t) || this.rng.pick(workplaces);
+  }
+
+  seedCrisis(){
+    // Every run begins at Day 1, 07:00. Only conditions are seeded; outcomes are not scripted.
+    const plant=this.buildings.find(b=>b.type==='plant');
+    const px=Math.floor((plant.x+plant.w/2)/this.tile),py=Math.floor((plant.y+plant.h/2)/this.tile);
+    for(let y=0;y<this.H;y++) for(let x=0;x<this.W;x++){
+      const d=Math.hypot(x-px,y-py);
+      this.rad[this.idx(x,y)]=clamp((17-d)/17,0,1)*.55;
+    }
+    // Seven residents are already incubating. Their neighbors only know what they can observe or hear.
+    const shuffled=[...this.agents].sort(()=>this.rng.next()-.5);
+    shuffled.slice(0,7).forEach((a,i)=>{a.infection=i<2?this.rng.range(.78,.92):this.rng.range(.32,.72);a.stress+=this.rng.range(10,25);this.remember(a,'Acordou com febre e sintomas incomuns.');});
+    shuffled.slice(
