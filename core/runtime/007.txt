@@ -1,0 +1,3 @@
+){const due=b.identityDueDay;b.identityDueDay=0;Promise.resolve(sim.ai.reflectIdentity(p,due)).then(ok=>{if(!ok&&b.lastIdentityDay<due)b.identityDueDay=due}).catch(()=>{if(b.lastIdentityDay<due)b.identityDueDay=due});continue}const e=b.replanPending;if(!e)continue;const deep=(p.health<45||p.infection>.35||p.radiation>.55||p.stress>82||(p.wounds||[]).some(w=>w.infected))&&sim.minute>(b.complexCooldown||0);if(sim.ai.decide(p,deep,e)&&deep)b.complexCooldown=sim.minute+180}cursor=(cursor+1)%Math.max(1,agents.length)},160);
+V.runtimeReady=true;
+})();
