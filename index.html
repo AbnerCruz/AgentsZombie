@@ -33,7 +33,7 @@
 
     <aside id="drawer" class="drawer glass" aria-hidden="true">
       <div class="drawerHead">
-        <div><b>OBSERVATÓRIO</b><small>v0.3 · mundo procedural</small></div>
+        <div><b>OBSERVATÓRIO</b><small>v0.4 · sandbox procedural</small></div>
         <button id="closeDrawer" class="iconBtn">×</button>
       </div>
 
@@ -47,7 +47,7 @@
       <section class="panel active" id="inspectPanel">
         <input id="search" class="field" placeholder="Buscar pessoa..." autocomplete="off" />
         <div id="searchResults" class="searchResults"></div>
-        <div id="inspector" class="emptyState">Toque em uma pessoa no mapa.</div>
+        <div id="inspector" class="emptyState">Toque em uma pessoa, construção ou veículo no mapa.</div>
       </section>
 
       <section class="panel" id="aiPanel">
@@ -57,13 +57,13 @@
         <label>Modelo leve<input id="lightModel" class="field" value="google/gemma-4-26b-a4b-it:free" /></label>
         <label>Modelo complexo<input id="deepModel" class="field" value="openai/gpt-oss-20b" /></label>
         <div class="meterBlock">
-          <div><span>Fila IA</span><b id="aiQueue">0</b></div>
+          <div><span>Cérebros ativos</span><b id="aiQueue">0</b></div>
           <div><span>Chamadas</span><b id="aiCalls">0</b></div>
           <div><span>Falhas</span><b id="aiFails">0</b></div>
           <div><span>Tokens</span><b id="aiTokens">0</b></div>
         </div>
         <label class="switch"><input id="aiEnabled" type="checkbox" checked /><span>Agentes de IA ativos</span></label>
-        <p class="hint">Sem API configurada, os 30 agentes continuam vivos fisicamente, mas ficam em modo de segurança local: necessidades básicas e reação imediata. NPCs e zumbis nunca consomem API.</p>
+        <p class="hint">Cada agente possui um ciclo independente de cérebro: não existe fila global. Sem API configurada, ele mantém apenas reflexos físicos imediatos. NPCs, militares e zumbis não consomem API.</p>
       </section>
 
       <section class="panel" id="worldtabPanel">
@@ -88,7 +88,6 @@
     <section id="agentCard" class="agentCard glass hidden"></section>
     <div id="toast" class="toast"></div>
   </main>
-
   <script src="loader.js"></script>
 </body>
 </html>
